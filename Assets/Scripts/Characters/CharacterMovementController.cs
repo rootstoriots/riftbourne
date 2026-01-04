@@ -3,6 +3,7 @@ using UnityEngine.InputSystem;
 using Riftbourne.Grid;
 using Riftbourne.Combat;
 using Riftbourne.Skills;
+using System.Collections.Generic;
 
 namespace Riftbourne.Characters
 {
@@ -62,12 +63,15 @@ namespace Riftbourne.Characters
                     // Clicked on a unit (enemy or ally)
                     if (targetUnit != null && targetUnit != unit)
                     {
-                        // Try to use Spark skill if available
-                        if (unit.KnownSkills.Count > 0)
-                        {
-                            Skill sparkSkill = unit.KnownSkills[0];
+                        // Get all available skills (from equipment + mastered)
+                        List<Skill> availableSkills = unit.GetAvailableSkills();
 
-                            if (SkillExecutor.ExecuteSkill(sparkSkill, unit, targetUnit))
+                        // Try to use first available skill
+                        if (availableSkills.Count > 0)
+                        {
+                            Skill firstSkill = availableSkills[0];
+
+                            if (SkillExecutor.ExecuteSkill(firstSkill, unit, targetUnit))
                             {
                                 // Skill cast successful - end turn
                                 turnManager.EndTurn();

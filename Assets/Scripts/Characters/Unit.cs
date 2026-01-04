@@ -4,6 +4,7 @@ using Riftbourne.Skills;
 using Riftbourne.Combat;
 using Riftbourne.UI;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Riftbourne.Characters
 {
@@ -27,18 +28,26 @@ namespace Riftbourne.Characters
         [Header("Skills")]
         [SerializeField] private List<Skill> knownSkills = new List<Skill>();
 
-        // Burn status effect tracking
-        private BurnEffect burnEffect = null;
-
-        public List<Skill> KnownSkills => knownSkills;
-        public bool IsBurning => burnEffect != null && !burnEffect.IsExpired;
-        public BurnEffect BurnEffect => burnEffect;
+        [Header("Equipment & Learning")]
+        [SerializeField] private List<EquipmentItem> startingEquipment = new List<EquipmentItem>();
 
         [Header("Unit Identity")]
         [SerializeField] private string unitName = "Unit";
         [SerializeField] private bool isPlayerControlled = true;
 
+        // Burn status effect tracking
+        private BurnEffect burnEffect = null;
+
+        // Equipment system
+        private Dictionary<EquipmentSlot, EquipmentItem> equippedItems = new Dictionary<EquipmentSlot, EquipmentItem>();
+
+        // Mastery tracking
+        private Dictionary<Skill, SkillMastery> skillMasteryProgress = new Dictionary<Skill, SkillMastery>();
+
         // Public properties
+        public List<Skill> KnownSkills => knownSkills;
+        public bool IsBurning => burnEffect != null && !burnEffect.IsExpired;
+        public BurnEffect BurnEffect => burnEffect;
         public int MaxHP => maxHP;
         public int CurrentHP => currentHP;
         public int AttackPower => attackPower;
@@ -70,6 +79,12 @@ namespace Riftbourne.Characters
             }
 
             // HP Display updates itself automatically in its Update() method
+
+            // Equip starting equipment
+            foreach (var item in startingEquipment)
+            {
+                EquipItem(item);
+            }
         }
 
         /// <summary>
@@ -199,5 +214,136 @@ namespace Riftbourne.Characters
                 Debug.Log($"{name} learned {skill.SkillName}!");
             }
         }
+
+        #region Equipment System
+
+        /// <summary>
+        /// Equip an item to the appropriate slot.
+        /// </summary>
+        public bool EquipItem(EquipmentItem item)
+        {
+            if (item == null) return false;
+
+            // Unequip whatever is in that slot currently
+            if (equippedItems.ContainsKey(item.SlotType))
+            {
+                UnequipItem(item.SlotType);
+            }
+
+            // Equip the new item
+            equippedItems[item.SlotType] = item;
+
+            // If it teaches a skill, start tracking mastery
+            if (item.TeachesSkill && !skillMasteryProgress.ContainsKey(item.GrantedSkill))
+            {
+                skillMasteryProgress[item.GrantedSkill] = new SkillMastery(item.GrantedSkill, item.MasteryThreshold);
+            }
+
+            Debug.Log($"{unitName} equipped {item.ItemName} in {item.SlotType} slot.");
+            return true;
+        }
+
+        /// <summary>
+        /// Unequip item from a slot.
+        /// </summary>
+        public bool UnequipItem(EquipmentSlot slot)
+        {
+            if (!equippedItems.ContainsKey(slot)) return false;
+
+            EquipmentItem item = equippedItems[slot];
+            equippedItems.Remove(slot);
+
+            Debug.Log($"{unitName} unequipped {item.ItemName} from {slot} slot.");
+            return true;
+        }
+
+        /// <summary>
+        /// Get the item equipped in a specific slot.
+        /// </summary>
+        public EquipmentItem GetEquippedItem(EquipmentSlot slot)
+        {
+            return equippedItems.ContainsKey(slot) ? equippedItems[slot] : null;
+        }
+
+        /// <summary>
+        /// Can this unit use a specific skill?
+        /// Checks both mastered skills AND equipped items.
+        /// </summary>
+        public bool CanUseSkill(Skill skill)
+        {
+            if (skill == null) return false;
+
+            // Check if skill is in known skills (backwards compatibility)
+            if (knownSkills.Contains(skill)) return true;
+
+            // Check if skill is mastered
+            if (skillMasteryProgress.ContainsKey(skill) && skillMasteryProgress[skill].isMastered)
+                return true;
+
+            // Check if any equipped item grants this skill
+            foreach (var equipped in equippedItems.Values)
+            {
+                if (equipped.GrantedSkill == skill)
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Record that a skill was used and update mastery progress.
+        /// </summary>
+        public void RecordSkillUsage(Skill skill)
+        {
+            if (skill == null) return;
+
+            // If we're tracking mastery for this skill, increment usage
+            if (skillMasteryProgress.ContainsKey(skill))
+            {
+                bool justMastered = skillMasteryProgress[skill].IncrementUsage();
+
+                if (justMastered)
+                {
+                    Debug.Log($"🎉 {unitName} has MASTERED {skill.SkillName}!");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Get mastery progress for a skill (returns null if not being learned).
+        /// </summary>
+        public SkillMastery GetMasteryProgress(Skill skill)
+        {
+            return skillMasteryProgress.ContainsKey(skill) ? skillMasteryProgress[skill] : null;
+        }
+
+        /// <summary>
+        /// Get all skills this unit can currently use (mastered + equipped).
+        /// </summary>
+        public List<Skill> GetAvailableSkills()
+        {
+            List<Skill> available = new List<Skill>();
+
+            // Add known skills (backwards compatibility)
+            available.AddRange(knownSkills);
+
+            // Add mastered skills
+            foreach (var mastery in skillMasteryProgress.Values)
+            {
+                if (mastery.isMastered && !available.Contains(mastery.skill))
+                    available.Add(mastery.skill);
+            }
+
+            // Add skills from equipped items
+            foreach (var item in equippedItems.Values)
+            {
+                if (item.TeachesSkill && !available.Contains(item.GrantedSkill))
+                    available.Add(item.GrantedSkill);
+            }
+
+            return available;
+        }
+
+        #endregion
     }
 }

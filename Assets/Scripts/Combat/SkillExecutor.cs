@@ -50,6 +50,9 @@ namespace Riftbourne.Combat
                 target.ApplyBurn(skill.BurnDamagePerTurn, skill.BurnDuration);
             }
 
+            // Record skill usage for mastery progression
+            user.RecordSkillUsage(skill);
+
             return true;
         }
     }
