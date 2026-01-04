@@ -1,5 +1,9 @@
 using UnityEngine;
 using Riftbourne.Grid;
+using Riftbourne.Skills;
+using Riftbourne.Combat;
+using Riftbourne.UI;
+using System.Collections.Generic;
 
 namespace Riftbourne.Characters
 {
@@ -10,6 +14,25 @@ namespace Riftbourne.Characters
         [SerializeField] private int currentHP;
         [SerializeField] private int attackPower = 15;
         [SerializeField] private int defensePower = 5;
+
+        [Header("UI")]
+        [SerializeField] private HPDisplay hpDisplay;
+
+        [Header("Magical Capacity")]
+        [SerializeField] private MantleType mantle = MantleType.None;
+
+        // Public property for Mantle
+        public MantleType Mantle => mantle;
+
+        [Header("Skills")]
+        [SerializeField] private List<Skill> knownSkills = new List<Skill>();
+
+        // Burn status effect tracking
+        private BurnEffect burnEffect = null;
+
+        public List<Skill> KnownSkills => knownSkills;
+        public bool IsBurning => burnEffect != null && !burnEffect.IsExpired;
+        public BurnEffect BurnEffect => burnEffect;
 
         [Header("Unit Identity")]
         [SerializeField] private string unitName = "Unit";
@@ -44,6 +67,28 @@ namespace Riftbourne.Characters
             else
             {
                 Debug.LogWarning($"{unitName} spawned at invalid grid position!");
+            }
+
+            // HP Display updates itself automatically in its Update() method
+        }
+
+        /// <summary>
+        /// Called at the start of this unit's turn to apply burn damage.
+        /// </summary>
+        public void OnTurnStart()
+        {
+            // Apply burn damage if burning
+            if (IsBurning)
+            {
+                burnEffect.ApplyBurnDamage();
+
+                // HP Display updates itself automatically
+
+                // Clean up expired burn
+                if (burnEffect.IsExpired)
+                {
+                    burnEffect = null;
+                }
             }
         }
 
@@ -116,6 +161,43 @@ namespace Riftbourne.Characters
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Apply a burn effect to this unit.
+        /// </summary>
+        public void ApplyBurn(int damagePerTurn, int duration)
+        {
+            if (burnEffect != null && !burnEffect.IsExpired)
+            {
+                // Refresh existing burn
+                burnEffect.Refresh(duration);
+            }
+            else
+            {
+                // Create new burn effect
+                burnEffect = new BurnEffect(this, damagePerTurn, duration);
+            }
+        }
+
+        /// <summary>
+        /// Check if this unit has a specific skill.
+        /// </summary>
+        public bool HasSkill(Skill skill)
+        {
+            return knownSkills.Contains(skill);
+        }
+
+        /// <summary>
+        /// Add a skill to this unit's known skills.
+        /// </summary>
+        public void LearnSkill(Skill skill)
+        {
+            if (!knownSkills.Contains(skill))
+            {
+                knownSkills.Add(skill);
+                Debug.Log($"{name} learned {skill.SkillName}!");
+            }
         }
     }
 }

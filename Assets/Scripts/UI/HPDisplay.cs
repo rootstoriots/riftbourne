@@ -29,12 +29,24 @@ namespace Riftbourne.UI
 
             canvas = canvasObj.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.WorldSpace;
+            canvas.sortingOrder = 100; // Render on top of everything
 
-            CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
-            scaler.dynamicPixelsPerUnit = 100;
+            // Add GraphicRaycaster so UI renders properly
+            canvasObj.AddComponent<GraphicRaycaster>();
 
-            // Set canvas scale to be much smaller
-            canvasObj.transform.localScale = new Vector3(0.01f, 0.01f, 0.01f);
+            // Set canvas to a reasonable world size
+            RectTransform canvasRect = canvasObj.GetComponent<RectTransform>();
+            canvasRect.sizeDelta = new Vector2(2, 1); // 2 units wide, 1 unit tall in world space
+
+            // Add a background image so we can see the canvas
+            GameObject bgObj = new GameObject("Background");
+            bgObj.transform.SetParent(canvasObj.transform);
+            Image bgImage = bgObj.AddComponent<Image>();
+            bgImage.color = new Color(0, 0, 0, 0.7f); // Semi-transparent black
+            RectTransform bgRect = bgObj.GetComponent<RectTransform>();
+            bgRect.anchorMin = Vector2.zero;
+            bgRect.anchorMax = Vector2.one;
+            bgRect.sizeDelta = Vector2.zero;
 
             // Create text object
             GameObject textObj = new GameObject("HPText");
@@ -43,15 +55,23 @@ namespace Riftbourne.UI
 
             hpText = textObj.AddComponent<Text>();
             hpText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            hpText.fontSize = 24;
+            hpText.fontSize = 32;
             hpText.alignment = TextAnchor.MiddleCenter;
             hpText.color = Color.white;
+            hpText.resizeTextForBestFit = true;
+            hpText.resizeTextMinSize = 10;
+            hpText.resizeTextMaxSize = 32;
 
-            RectTransform rectTransform = textObj.GetComponent<RectTransform>();
-            rectTransform.sizeDelta = new Vector2(200, 50);
+            RectTransform textRect = textObj.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.sizeDelta = Vector2.zero; // Fill parent
 
-            // Make canvas face camera
-            canvasObj.transform.rotation = Quaternion.Euler(0, 180, 0);
+            // Make canvas face camera initially
+            canvasObj.transform.LookAt(Camera.main.transform);
+            canvasObj.transform.Rotate(0, 180, 0);
+
+            Debug.Log($"HPDisplay created for {unit.UnitName}: Canvas size = {canvasRect.sizeDelta}, Position = {canvasObj.transform.position}");
         }
 
         private void Update()

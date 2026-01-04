@@ -38,6 +38,10 @@ namespace Riftbourne.Combat
             {
                 currentTurnIndex = 0;
                 CurrentUnit = allUnits[currentTurnIndex];
+
+                // Apply burn damage at start of first turn
+                CurrentUnit.OnTurnStart();
+
                 Debug.Log($"Combat started! {CurrentUnit.UnitName}'s turn.");
             }
             else
@@ -47,39 +51,43 @@ namespace Riftbourne.Combat
         }
 
         /// <summary>
-        /// End current unit's turn and advance to next unit.
+        /// End the current unit's turn and advance to the next unit.
         /// </summary>
         public void EndTurn()
         {
-            if (allUnits.Count == 0) return;
-
             Debug.Log($"{CurrentUnit.UnitName} ended their turn.");
 
-            // Check if combat is over before advancing turn
+            // Move to next unit
+            do
+            {
+                currentTurnIndex = (currentTurnIndex + 1) % allUnits.Count;
+                CurrentUnit = allUnits[currentTurnIndex];
+            }
+            while (!CurrentUnit.IsAlive && allUnits.Count > 0);
+
+            // Check if combat is over
             if (IsCombatOver())
             {
-                return; // Stop processing turns
-            }
-
-            // Move to next unit, loop back to start if at end
-            currentTurnIndex = (currentTurnIndex + 1) % allUnits.Count;
-            CurrentUnit = allUnits[currentTurnIndex];
-
-            Debug.Log($"{CurrentUnit.UnitName}'s turn!");
-
-            // Skip dead units
-            if (!CurrentUnit.IsAlive)
-            {
-                Debug.Log($"{CurrentUnit.UnitName} is defeated, skipping turn.");
-                EndTurn(); // Recursive call to skip to next alive unit
                 return;
             }
 
-            // Auto-end enemy turns for now (no AI yet)
+            Debug.Log($"--- {CurrentUnit.UnitName}'s turn! ---");
+
+            // Apply burn damage at start of turn
+            CurrentUnit.OnTurnStart();
+
+            // If unit died from burn, end turn immediately
+            if (!CurrentUnit.IsAlive)
+            {
+                Debug.Log($"{CurrentUnit.UnitName} died from burn damage!");
+                EndTurn();
+                return;
+            }
+
+            // Auto-end turn for enemy units (until AI is implemented)
             if (!CurrentUnit.IsPlayerControlled)
             {
-                Debug.Log($"{CurrentUnit.UnitName} (AI) automatically ends turn.");
-                Invoke(nameof(EndTurn), 0.5f); // Wait half second then end turn
+                Invoke(nameof(EndTurn), 0.5f);
             }
         }
 

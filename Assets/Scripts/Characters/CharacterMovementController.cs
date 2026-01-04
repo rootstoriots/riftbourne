@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using Riftbourne.Grid;
 using Riftbourne.Combat;
+using Riftbourne.Skills;
 
 namespace Riftbourne.Characters
 {
@@ -32,14 +33,8 @@ namespace Riftbourne.Characters
 
         private void Update()
         {
-            // Only process input if this is the current unit's turn
-            if (turnManager != null && turnManager.CurrentUnit != unit)
-            {
-                return; // Not this unit's turn
-            }
-
-            // Only player-controlled units respond to clicks
-            if (!unit.IsPlayerControlled)
+            // Only process input during this unit's turn
+            if (turnManager == null || turnManager.CurrentUnit != unit)
             {
                 return;
             }
@@ -47,7 +42,60 @@ namespace Riftbourne.Characters
             // Check for mouse click
             if (Mouse.current.leftButton.wasPressedThisFrame)
             {
-                HandleMouseClick();
+                Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
+                RaycastHit hit;
+
+                if (Physics.Raycast(ray, out hit))
+                {
+                    Vector3 hitPoint = hit.point;
+                    int targetX = Mathf.FloorToInt(hitPoint.x);
+                    int targetY = Mathf.FloorToInt(hitPoint.z);
+
+                    if (!gridManager.IsValidGridPosition(targetX, targetY))
+                    {
+                        return;
+                    }
+
+                    GridCell targetCell = gridManager.GetCell(targetX, targetY);
+                    Unit targetUnit = targetCell.OccupyingUnit;
+
+                    // Clicked on a unit (enemy or ally)
+                    if (targetUnit != null && targetUnit != unit)
+                    {
+                        // Try to use Spark skill if available
+                        if (unit.KnownSkills.Count > 0)
+                        {
+                            Skill sparkSkill = unit.KnownSkills[0];
+
+                            if (SkillExecutor.ExecuteSkill(sparkSkill, unit, targetUnit))
+                            {
+                                // Skill cast successful - end turn
+                                turnManager.EndTurn();
+                                return;
+                            }
+                        }
+
+                        // Fall back to melee attack if skill failed or no skills
+                        if (AttackAction.ExecuteMeleeAttack(unit, targetUnit))
+                        {
+                            turnManager.EndTurn();
+                        }
+                    }
+                    else
+                    {
+                        // Clicked on empty cell - try to move there
+                        if (unit.CanMoveTo(targetX, targetY))
+                        {
+                            Vector3 targetWorldPos = targetCell.WorldPosition;
+                            unit.MoveTo(targetX, targetY, targetWorldPos);
+                            turnManager.EndTurn();
+                        }
+                        else
+                        {
+                            Debug.Log("Cannot move there - out of range or cell occupied");
+                        }
+                    }
+                }
             }
         }
 
