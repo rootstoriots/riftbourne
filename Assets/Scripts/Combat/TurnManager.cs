@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace SongOfTheShattered.Combat
+namespace Riftbourne.Combat
 {
     public class TurnManager : MonoBehaviour
     {

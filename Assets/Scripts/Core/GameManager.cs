@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace SongOfTheShattered.Core
+namespace Riftbourne.Core
 {
     public class GameManager : MonoBehaviour
     {
@@ -21,7 +21,7 @@ namespace SongOfTheShattered.Core
 
         private void Start()
         {
-            Debug.Log("Song of the Shattered - Game Manager Initialized");
+            Debug.Log("Riftbourne - Game Manager Initialized");
         }
     }
 }
