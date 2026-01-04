@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &1979788051672205453
+--- !u!1 &402787091324160107
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,50 +8,48 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 4084236586714226628}
-  - component: {fileID: 475894111188877074}
-  - component: {fileID: 8072418448336139124}
-  - component: {fileID: 8652051379661686428}
-  - component: {fileID: 6955456904013367620}
-  - component: {fileID: 3795986060918009882}
-  - component: {fileID: 644141902914850966}
+  - component: {fileID: 5808024134342609170}
+  - component: {fileID: 4333130605535192748}
+  - component: {fileID: 7867312870576611441}
+  - component: {fileID: 6189617795732575617}
+  - component: {fileID: 5032910207788555657}
   m_Layer: 0
-  m_Name: PlayerCharacter
+  m_Name: EnemyUnit
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &4084236586714226628
+--- !u!4 &5808024134342609170
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1979788051672205453}
+  m_GameObject: {fileID: 402787091324160107}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2, y: 0.5, z: 0}
+  m_LocalPosition: {x: 3, y: 0.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &475894111188877074
+--- !u!33 &4333130605535192748
 MeshFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1979788051672205453}
+  m_GameObject: {fileID: 402787091324160107}
   m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &8072418448336139124
+--- !u!23 &7867312870576611441
 MeshRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1979788051672205453}
+  m_GameObject: {fileID: 402787091324160107}
   m_Enabled: 1
   m_CastShadows: 1
   m_ReceiveShadows: 1
@@ -70,7 +68,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 56cb740245fb02a43b034d5414618bee, type: 2}
+  - {fileID: 2100000, guid: 9067df9194f1ec54d975f3eb6aae4fda, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -94,13 +92,13 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!136 &8652051379661686428
+--- !u!136 &6189617795732575617
 CapsuleCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1979788051672205453}
+  m_GameObject: {fileID: 402787091324160107}
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -117,13 +115,13 @@ CapsuleCollider:
   m_Height: 2
   m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &6955456904013367620
+--- !u!114 &5032910207788555657
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1979788051672205453}
+  m_GameObject: {fileID: 402787091324160107}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cfac7a5412679864d92ece6b2aac95c8, type: 3}
@@ -134,40 +132,10 @@ MonoBehaviour:
   gridY: 0
   movementRange: 5
   moveSpeed: 5
-  maxHP: 100
+  maxHP: 80
+  maxHP: 80
   currentHP: 0
-  attackPower: 20
-  defensePower: 5
-  unitName: Player
-  isPlayerControlled: 1
---- !u!114 &3795986060918009882
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1979788051672205453}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 040e1ccc5cb952e4993b7c226ffd962a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Characters.CharacterMovementController
-  gridManager: {fileID: 0}
-  turnManager: {fileID: 0}
-  unit: {fileID: 0}
---- !u!114 &644141902914850966
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1979788051672205453}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 68179dc41b0014d45b19a6e640cbb4bb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.UI.HPDisplay
-  unit: {fileID: 0}
-  canvas: {fileID: 0}
-  hpText: {fileID: 0}
-  offset: {x: 0, y: 2, z: 0}
+  attackPower: 15
+  defensePower: 3
+  unitName: Enemy
+  isPlayerControlled: 0

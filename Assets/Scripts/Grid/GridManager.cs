@@ -53,12 +53,12 @@ namespace Riftbourne.Grid
 
         private void OnEnable()
         {
-            inputActions.Gameplay.Enable();
+            inputActions?.Gameplay.Enable();
         }
 
         private void OnDisable()
         {
-            inputActions.Gameplay.Disable();
+            inputActions?.Gameplay.Disable();
         }
 
         private void Update()

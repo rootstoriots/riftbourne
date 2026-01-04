@@ -9,6 +9,7 @@ namespace Riftbourne.Grid
         public Vector3 WorldPosition { get; private set; }
         public bool IsWalkable { get; set; }
         public GameObject VisualObject { get; set; }
+        public Riftbourne.Characters.Unit OccupyingUnit { get; set; }
 
         public GridCell(int x, int y, Vector3 worldPosition)
         {

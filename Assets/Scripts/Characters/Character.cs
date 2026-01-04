@@ -1,4 +1,5 @@
 using UnityEngine;
+using Riftbourne.Grid;
 
 namespace Riftbourne.Characters
 {
@@ -15,10 +16,6 @@ namespace Riftbourne.Characters
         [SerializeField] private int movementRange = 5;
         [SerializeField] private float moveSpeed = 5f;
 
-        [Header("Stats (Future)")]
-        [SerializeField] private int maxHP = 100;
-        private int currentHP;
-
         // Public properties
         public string CharacterName => characterName;
         public int GridX => gridX;
@@ -28,11 +25,6 @@ namespace Riftbourne.Characters
 
         // Movement state
         private Vector3 targetPosition;
-
-        private void Awake()
-        {
-            currentHP = maxHP;
-        }
 
         private void Update()
         {
@@ -47,6 +39,7 @@ namespace Riftbourne.Characters
         /// </summary>
         public void SetGridPosition(int x, int y, Vector3 worldPosition)
         {
+            UpdateGridOccupancy(x, y);
             gridX = x;
             gridY = y;
             transform.position = worldPosition + Vector3.up * 0.5f; // Offset so capsule sits on grid
@@ -58,6 +51,7 @@ namespace Riftbourne.Characters
         /// </summary>
         public void MoveTo(int x, int y, Vector3 worldPosition)
         {
+            UpdateGridOccupancy(x, y);
             gridX = x;
             gridY = y;
             targetPosition = worldPosition + Vector3.up * 0.5f;
@@ -93,6 +87,29 @@ namespace Riftbourne.Characters
         {
             int distance = Mathf.Abs(targetX - gridX) + Mathf.Abs(targetY - gridY);
             return distance <= movementRange;
+        }
+
+        /// <summary>
+        /// Updates grid cell occupancy when moving
+        /// </summary>
+        private void UpdateGridOccupancy(int newX, int newY)
+        {
+            GridManager gridManager = FindFirstObjectByType<GridManager>();
+            if (gridManager == null) return;
+
+            // Clear old position
+            GridCell oldCell = gridManager.GetCell(gridX, gridY);
+            if (oldCell != null && oldCell.OccupyingUnit == GetComponent<Unit>())
+            {
+                oldCell.OccupyingUnit = null;
+            }
+
+            // Set new position
+            GridCell newCell = gridManager.GetCell(newX, newY);
+            if (newCell != null)
+            {
+                newCell.OccupyingUnit = GetComponent<Unit>();
+            }
         }
     }
 }
