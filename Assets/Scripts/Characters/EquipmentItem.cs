@@ -16,10 +16,10 @@ namespace Riftbourne.Characters
         [SerializeField] private EquipmentSlot slotType;
 
         [Header("Skill Learning")]
-        [Tooltip("The skill this equipment grants access to (optional)")]
-        [SerializeField] private Skill grantedSkill;
+        [Tooltip("The skills this equipment grants access to (can teach multiple skills)")]
+        [SerializeField] private System.Collections.Generic.List<Skill> grantedSkills = new System.Collections.Generic.List<Skill>();
 
-        [Tooltip("How many times the skill must be used to master it (0 = cannot be mastered)")]
+        [Tooltip("How many times each skill must be used to master it (0 = cannot be mastered)")]
         [SerializeField] private int masteryThreshold = 5;
 
         [Header("Stat Modifiers (Future)")]
@@ -31,14 +31,14 @@ namespace Riftbourne.Characters
         public string ItemName => itemName;
         public string Description => description;
         public EquipmentSlot SlotType => slotType;
-        public Skill GrantedSkill => grantedSkill;
+        public System.Collections.Generic.List<Skill> GrantedSkills => grantedSkills;
         public int MasteryThreshold => masteryThreshold;
         public int AttackBonus => attackBonus;
         public int DefenseBonus => defenseBonus;
 
         /// <summary>
-        /// Does this equipment teach a skill?
+        /// Does this equipment teach any skills?
         /// </summary>
-        public bool TeachesSkill => grantedSkill != null;
+        public bool TeachesSkills => grantedSkills != null && grantedSkills.Count > 0;
     }
 }

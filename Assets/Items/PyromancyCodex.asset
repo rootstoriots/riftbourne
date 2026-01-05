@@ -16,7 +16,9 @@ MonoBehaviour:
   description: A foundational text on fire magic. Grants access to Spark while equipped.
     Master it through repeated use.
   slotType: 5
-  grantedSkill: {fileID: 11400000, guid: 127dd468c31a776428b6b09dd374f294, type: 2}
+  grantedSkills:
+  - {fileID: 11400000, guid: 127dd468c31a776428b6b09dd374f294, type: 2}
+  - {fileID: 11400000, guid: 4bb1dfe22e38df04b83f681d49ec3190, type: 2}
   masteryThreshold: 5
   attackBonus: 0
   defenseBonus: 0

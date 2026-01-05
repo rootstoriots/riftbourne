@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using Riftbourne.Characters;
+using Riftbourne.Grid;
 
 namespace Riftbourne.Combat
 {
@@ -14,8 +15,16 @@ namespace Riftbourne.Combat
         public Unit CurrentUnit { get; private set; }
         public bool IsPlayerTurn => CurrentUnit != null && CurrentUnit.IsPlayerControlled;
 
+        // Managers
+        private HazardManager hazardManager;
+
+        // Round tracking for hazard updates
+        private int lastHazardUpdateRound = 0;
+        private int currentRound = 1;
+
         private void Start()
         {
+            hazardManager = FindFirstObjectByType<HazardManager>();
             InitializeCombat();
         }
 
@@ -57,6 +66,18 @@ namespace Riftbourne.Combat
         {
             Debug.Log($"{CurrentUnit.UnitName} ended their turn.");
 
+            // Apply hazard damage to unit ending their turn (BEFORE moving to next unit)
+            if (hazardManager != null && CurrentUnit.IsAlive)
+            {
+                hazardManager.ApplyHazardDamage(CurrentUnit, CurrentUnit.GridX, CurrentUnit.GridY);
+            }
+
+            // Check if unit died from hazard damage
+            if (IsCombatOver())
+            {
+                return;
+            }
+
             // Move to next unit
             do
             {
@@ -65,10 +86,25 @@ namespace Riftbourne.Combat
             }
             while (!CurrentUnit.IsAlive && allUnits.Count > 0);
 
-            // Check if combat is over
+            // Check if we completed a full round (returned to index 0)
+            if (currentTurnIndex == 0)
+            {
+                currentRound++;
+                Debug.Log($"=== ROUND {currentRound} ===");
+            }
+
+            // Check if combat is over after finding next unit
             if (IsCombatOver())
             {
                 return;
+            }
+
+            // Update hazards only ONCE per round (when we start a new round)
+            if (hazardManager != null && currentRound > lastHazardUpdateRound)
+            {
+                hazardManager.UpdateHazards();
+                lastHazardUpdateRound = currentRound;
+                Debug.Log("Hazards updated (durations decremented)");
             }
 
             Debug.Log($"--- {CurrentUnit.UnitName}'s turn! ---");

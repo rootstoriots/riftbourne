@@ -27,6 +27,11 @@ namespace Riftbourne.Skills
         [SerializeField] private int burnDuration = 3;
         [SerializeField] private int burnDamagePerTurn = 5;
 
+        [Header("Ground Hazard")]
+        [SerializeField] private bool createsGroundHazard = false;
+        [SerializeField] private int hazardDuration = 3;
+        [SerializeField] private int hazardDamagePerTurn = 5;
+
         [Header("Targeting")]
         [SerializeField] private int range = 1; // Manhattan distance
         [SerializeField] private bool requiresLineOfSight = true;
@@ -43,6 +48,9 @@ namespace Riftbourne.Skills
         public int BurnDamagePerTurn => burnDamagePerTurn;
         public int Range => range;
         public bool RequiresLineOfSight => requiresLineOfSight;
+        public bool CreatesGroundHazard => createsGroundHazard;
+        public int HazardDuration => hazardDuration;
+        public int HazardDamagePerTurn => hazardDamagePerTurn;
 
         /// <summary>
         /// Checks if a unit can use this skill.

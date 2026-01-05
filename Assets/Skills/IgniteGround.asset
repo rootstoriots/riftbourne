@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b8ae4acd9898594c9ce700a3aafb268, type: 3}
+  m_Name: IgniteGround
+  m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Skills.Skill
+  skillName: Ignite Ground
+  tier: 1
+  description: Creates a blazing fire on target ground cell. Units ending their turn
+    on fire take damage.
+  requiredMantle: 1
+  minimumLevel: 1
+  baseDamage: 0
+  appliesBurn: 0
+  burnDuration: 3
+  burnDamagePerTurn: 5
+  createsGroundHazard: 1
+  hazardDuration: 3
+  hazardDamagePerTurn: 5
+  range: 3
+  requiresLineOfSight: 1

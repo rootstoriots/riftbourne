@@ -14,6 +14,10 @@ namespace Riftbourne.Characters
         [SerializeField] private TurnManager turnManager;
         [SerializeField] private Unit unit;
 
+        // Skill selection state
+        private Skill selectedSkill = null;
+        private bool awaitingSkillTarget = false;
+
         private void Awake()
         {
             unit = GetComponent<Unit>();
@@ -40,133 +44,156 @@ namespace Riftbourne.Characters
                 return;
             }
 
-            // Check for mouse click
+            // Number key selection (1-9) when skill menu is open
+            if (awaitingSkillTarget && Keyboard.current != null)
+            {
+                List<Skill> availableSkills = unit.GetAvailableSkills();
+
+                if (Keyboard.current.digit1Key.wasPressedThisFrame && availableSkills.Count >= 1)
+                    SelectSkill(availableSkills[0]);
+                if (Keyboard.current.digit2Key.wasPressedThisFrame && availableSkills.Count >= 2)
+                    SelectSkill(availableSkills[1]);
+                if (Keyboard.current.digit3Key.wasPressedThisFrame && availableSkills.Count >= 3)
+                    SelectSkill(availableSkills[2]);
+                if (Keyboard.current.digit4Key.wasPressedThisFrame && availableSkills.Count >= 4)
+                    SelectSkill(availableSkills[3]);
+                if (Keyboard.current.digit5Key.wasPressedThisFrame && availableSkills.Count >= 5)
+                    SelectSkill(availableSkills[4]);
+            }
+
+            // LEFT CLICK - Movement, melee attack, or skill targeting
             if (Mouse.current.leftButton.wasPressedThisFrame)
             {
-                Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
-                RaycastHit hit;
+                HandleLeftClick();
+            }
 
-                if (Physics.Raycast(ray, out hit))
-                {
-                    Vector3 hitPoint = hit.point;
-                    int targetX = Mathf.FloorToInt(hitPoint.x);
-                    int targetY = Mathf.FloorToInt(hitPoint.z);
+            // RIGHT CLICK - Skill selection menu
+            if (Mouse.current.rightButton.wasPressedThisFrame)
+            {
+                HandleRightClick();
+            }
 
-                    if (!gridManager.IsValidGridPosition(targetX, targetY))
-                    {
-                        return;
-                    }
-
-                    GridCell targetCell = gridManager.GetCell(targetX, targetY);
-                    Unit targetUnit = targetCell.OccupyingUnit;
-
-                    // Clicked on a unit (enemy or ally)
-                    if (targetUnit != null && targetUnit != unit)
-                    {
-                        // Get all available skills (from equipment + mastered)
-                        List<Skill> availableSkills = unit.GetAvailableSkills();
-
-                        // Try to use first available skill
-                        if (availableSkills.Count > 0)
-                        {
-                            Skill firstSkill = availableSkills[0];
-
-                            if (SkillExecutor.ExecuteSkill(firstSkill, unit, targetUnit))
-                            {
-                                // Skill cast successful - end turn
-                                turnManager.EndTurn();
-                                return;
-                            }
-                        }
-
-                        // Fall back to melee attack if skill failed or no skills
-                        if (AttackAction.ExecuteMeleeAttack(unit, targetUnit))
-                        {
-                            turnManager.EndTurn();
-                        }
-                    }
-                    else
-                    {
-                        // Clicked on empty cell - try to move there
-                        if (unit.CanMoveTo(targetX, targetY))
-                        {
-                            Vector3 targetWorldPos = targetCell.WorldPosition;
-                            unit.MoveTo(targetX, targetY, targetWorldPos);
-                            turnManager.EndTurn();
-                        }
-                        else
-                        {
-                            Debug.Log("Cannot move there - out of range or cell occupied");
-                        }
-                    }
-                }
+            // ESC to cancel skill selection
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                CancelSkillSelection();
             }
         }
 
-        private void HandleMouseClick()
+        private void HandleLeftClick()
         {
             Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
             RaycastHit hit;
 
-            if (Physics.Raycast(ray, out hit))
+            if (!Physics.Raycast(ray, out hit))
+                return;
+
+            Vector3 hitPoint = hit.point;
+            int targetX = Mathf.FloorToInt(hitPoint.x);
+            int targetY = Mathf.FloorToInt(hitPoint.z);
+
+            if (!gridManager.IsValidGridPosition(targetX, targetY))
+                return;
+
+            GridCell targetCell = gridManager.GetCell(targetX, targetY);
+            Unit targetUnit = targetCell.OccupyingUnit;
+
+            // CASE 1: Using a selected skill
+            if (awaitingSkillTarget && selectedSkill != null)
             {
-                // Check if we clicked on another unit
-                Unit clickedUnit = hit.collider.GetComponent<Unit>();
-                if (clickedUnit != null && clickedUnit != unit)
-                {
-                    // Clicked on another unit - try to attack
-                    TryAttackUnit(clickedUnit);
-                    return;
-                }
-
-                // Otherwise, try to move to the clicked position
-                Vector3 hitPoint = hit.point;
-                int targetX = Mathf.FloorToInt(hitPoint.x);
-                int targetY = Mathf.FloorToInt(hitPoint.z);
-
-                if (gridManager.IsValidGridPosition(targetX, targetY))
-                {
-                    gridManager.SelectCell(targetX, targetY);
-                    TryMoveToSelectedCell();
-                }
+                UseSelectedSkill(targetX, targetY, targetUnit);
+                return;
             }
-        }
 
-        private void TryMoveToSelectedCell()
-        {
-            GridCell selectedCell = gridManager.GetSelectedCell();
-            if (selectedCell == null) return;
-
-            // Check if unit can move to this cell (within range and not moving)
-            if (unit.CanMoveTo(selectedCell.X, selectedCell.Y))
+            // CASE 2: Clicked on enemy unit - melee attack
+            if (targetUnit != null && targetUnit != unit)
             {
-                Vector3 targetWorldPos = new Vector3(selectedCell.X + 0.5f, 0.5f, selectedCell.Y + 0.5f);
-                unit.MoveTo(selectedCell.X, selectedCell.Y, targetWorldPos);
-
-                // After moving, end turn
-                if (turnManager != null)
+                if (AttackAction.ExecuteMeleeAttack(unit, targetUnit))
                 {
                     turnManager.EndTurn();
                 }
+                return;
+            }
+
+            // CASE 3: Clicked on empty cell - move
+            if (unit.CanMoveTo(targetX, targetY))
+            {
+                Vector3 targetWorldPos = targetCell.WorldPosition;
+                unit.MoveTo(targetX, targetY, targetWorldPos);
+                turnManager.EndTurn();
             }
             else
             {
-                Debug.Log("Cannot move to that cell (out of range or already moving)");
+                Debug.Log("Cannot move there - out of range or cell occupied");
             }
         }
 
-        private void TryAttackUnit(Unit target)
+        private void HandleRightClick()
         {
-            bool attackSuccessful = AttackAction.ExecuteMeleeAttack(unit, target);
+            // Show skill selection menu
+            List<Skill> availableSkills = unit.GetAvailableSkills();
 
-            if (attackSuccessful)
+            if (availableSkills.Count == 0)
             {
-                // After attacking, end turn
-                if (turnManager != null)
-                {
-                    turnManager.EndTurn();
-                }
+                Debug.Log("No skills available!");
+                return;
             }
+
+            // Show menu and wait for number key press
+            Debug.Log("=== AVAILABLE SKILLS ===");
+            for (int i = 0; i < availableSkills.Count; i++)
+            {
+                string groundTarget = availableSkills[i].CreatesGroundHazard ? " [GROUND]" : " [UNIT]";
+                Debug.Log($"Press [{i + 1}]: {availableSkills[i].SkillName}{groundTarget} (Range: {availableSkills[i].Range})");
+            }
+            Debug.Log("ESC to cancel.");
+
+            // Set flag to listen for number keys
+            awaitingSkillTarget = true;
+            selectedSkill = null; // Don't auto-select!
+        }
+
+        private void SelectSkill(Skill skill)
+        {
+            selectedSkill = skill;
+            awaitingSkillTarget = true;
+            Debug.Log($">>> Selected: {skill.SkillName} - Click target to use (ESC to cancel) <<<");
+        }
+
+        private void UseSelectedSkill(int targetX, int targetY, Unit targetUnit)
+        {
+            bool success = false;
+
+            // Ground-targeted skill (Ignite Ground)
+            if (selectedSkill.CreatesGroundHazard)
+            {
+                success = SkillExecutor.ExecuteGroundSkill(selectedSkill, unit, targetX, targetY);
+            }
+            // Unit-targeted skill (Spark)
+            else if (targetUnit != null && targetUnit != unit)
+            {
+                success = SkillExecutor.ExecuteSkill(selectedSkill, unit, targetUnit);
+            }
+            else
+            {
+                Debug.Log($"{selectedSkill.SkillName} requires a valid target!");
+            }
+
+            if (success)
+            {
+                CancelSkillSelection();
+                turnManager.EndTurn();
+            }
+        }
+
+        private void CancelSkillSelection()
+        {
+            if (awaitingSkillTarget)
+            {
+                Debug.Log("Skill selection cancelled");
+            }
+            selectedSkill = null;
+            awaitingSkillTarget = false;
         }
     }
 }

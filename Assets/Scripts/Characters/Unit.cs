@@ -233,10 +233,16 @@ namespace Riftbourne.Characters
             // Equip the new item
             equippedItems[item.SlotType] = item;
 
-            // If it teaches a skill, start tracking mastery
-            if (item.TeachesSkill && !skillMasteryProgress.ContainsKey(item.GrantedSkill))
+            // If it teaches skills, start tracking mastery for each
+            if (item.TeachesSkills)
             {
-                skillMasteryProgress[item.GrantedSkill] = new SkillMastery(item.GrantedSkill, item.MasteryThreshold);
+                foreach (Skill skill in item.GrantedSkills)
+                {
+                    if (!skillMasteryProgress.ContainsKey(skill))
+                    {
+                        skillMasteryProgress[skill] = new SkillMastery(skill, item.MasteryThreshold);
+                    }
+                }
             }
 
             Debug.Log($"{unitName} equipped {item.ItemName} in {item.SlotType} slot.");
@@ -283,7 +289,7 @@ namespace Riftbourne.Characters
             // Check if any equipped item grants this skill
             foreach (var equipped in equippedItems.Values)
             {
-                if (equipped.GrantedSkill == skill)
+                if (equipped.GrantedSkills != null && equipped.GrantedSkills.Contains(skill))
                     return true;
             }
 
@@ -337,8 +343,14 @@ namespace Riftbourne.Characters
             // Add skills from equipped items
             foreach (var item in equippedItems.Values)
             {
-                if (item.TeachesSkill && !available.Contains(item.GrantedSkill))
-                    available.Add(item.GrantedSkill);
+                if (item.TeachesSkills)
+                {
+                    foreach (Skill skill in item.GrantedSkills)
+                    {
+                        if (!available.Contains(skill))
+                            available.Add(skill);
+                    }
+                }
             }
 
             return available;

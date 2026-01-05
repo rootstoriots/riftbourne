@@ -10,6 +10,7 @@ namespace Riftbourne.Grid
         public bool IsWalkable { get; set; }
         public GameObject VisualObject { get; set; }
         public Riftbourne.Characters.Unit OccupyingUnit { get; set; }
+        public HazardTile Hazard { get; set; } // Fire, ice, poison, etc.
 
         public GridCell(int x, int y, Vector3 worldPosition)
         {

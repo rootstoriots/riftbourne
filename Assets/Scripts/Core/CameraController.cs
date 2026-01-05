@@ -56,6 +56,10 @@ namespace Riftbourne.Core
         private void HandleRotationInput()
         {
             // Read the CameraRotate action value
+            // Safety check - if inputActions is null, skip
+            if (inputActions == null)
+                return;
+
             float rotationInput = inputActions.Gameplay.CameraRotate.ReadValue<float>();
 
             if (rotationInput != 0f)
