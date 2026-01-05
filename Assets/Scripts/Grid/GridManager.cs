@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Riftbourne.Grid;
+using System.Collections.Generic;
 
 namespace Riftbourne.Grid
 {
@@ -14,6 +16,9 @@ namespace Riftbourne.Grid
         [SerializeField] private Material lineMaterial;
         [SerializeField] private Color normalLineColor = Color.white;
         [SerializeField] private Color selectedCellColor = Color.yellow;
+
+        [Header("Range Visualization")]
+        [SerializeField] private RangeVisualizer rangeVisualizer;
 
         // Grid data
         private GridCell[,] grid;
@@ -216,6 +221,94 @@ namespace Riftbourne.Grid
                 0,
                 (gridHeight * cellSize) / 2f
             );
+        }
+        /// <summary>
+        /// Get all cells within movement range of a position.
+        /// </summary>
+        public List<GridCell> GetCellsInMovementRange(int startX, int startY, int range)
+        {
+            List<GridCell> cellsInRange = new List<GridCell>();
+
+            for (int x = 0; x < gridWidth; x++)
+            {
+                for (int y = 0; y < gridHeight; y++)
+                {
+                    // Calculate Manhattan distance
+                    int distance = Mathf.Abs(x - startX) + Mathf.Abs(y - startY);
+
+                    if (distance <= range && distance > 0) // Don't include current cell
+                    {
+                        GridCell cell = GetCell(x, y);
+                        if (cell != null && cell.IsWalkable && cell.OccupyingUnit == null)
+                        {
+                            cellsInRange.Add(cell);
+                        }
+                    }
+                }
+            }
+
+            return cellsInRange;
+        }
+
+        /// <summary>
+        /// Get all cells within attack range of a position.
+        /// </summary>
+        public List<GridCell> GetCellsInAttackRange(int startX, int startY, int range)
+        {
+            List<GridCell> cellsInRange = new List<GridCell>();
+
+            for (int x = 0; x < gridWidth; x++)
+            {
+                for (int y = 0; y < gridHeight; y++)
+                {
+                    // Calculate Manhattan distance
+                    int distance = Mathf.Abs(x - startX) + Mathf.Abs(y - startY);
+
+                    if (distance <= range && distance > 0) // Don't include current cell
+                    {
+                        GridCell cell = GetCell(x, y);
+                        if (cell != null && cell.OccupyingUnit != null)
+                        {
+                            cellsInRange.Add(cell);
+                        }
+                    }
+                }
+            }
+
+            return cellsInRange;
+        }
+
+        /// <summary>
+        /// Show movement range visualization.
+        /// </summary>
+        public void ShowMovementRange(int startX, int startY, int range)
+        {
+            if (rangeVisualizer == null) return;
+
+            List<GridCell> cells = GetCellsInMovementRange(startX, startY, range);
+            rangeVisualizer.ShowMovementRange(cells);
+        }
+
+        /// <summary>
+        /// Show attack range visualization.
+        /// </summary>
+        public void ShowAttackRange(int startX, int startY, int range)
+        {
+            if (rangeVisualizer == null) return;
+
+            List<GridCell> cells = GetCellsInAttackRange(startX, startY, range);
+            rangeVisualizer.ShowAttackRange(cells);
+        }
+
+        /// <summary>
+        /// Clear all range highlights.
+        /// </summary>
+        public void ClearRangeHighlights()
+        {
+            if (rangeVisualizer != null)
+            {
+                rangeVisualizer.ClearHighlights();
+            }
         }
     }
 }

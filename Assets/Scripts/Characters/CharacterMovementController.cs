@@ -173,6 +173,13 @@ namespace Riftbourne.Characters
             selectedSkill = null; // Don't auto-select!
         }
 
+        /// <summary>
+        /// Public method for UI to trigger skill selection.
+        /// </summary>
+        public void SelectSkillFromUI(Skill skill)
+        {
+            SelectSkill(skill);
+        }
         private void SelectSkill(Skill skill)
         {
             selectedSkill = skill;

@@ -15,6 +15,14 @@ namespace Riftbourne.Combat
         public Unit CurrentUnit { get; private set; }
         public bool IsPlayerTurn => CurrentUnit != null && CurrentUnit.IsPlayerControlled;
 
+        /// <summary>
+        /// Returns a copy of all units in combat for UI display.
+        /// </summary>
+        public List<Unit> GetAllUnits()
+        {
+            return new List<Unit>(allUnits);
+        }
+
         // Managers
         private HazardManager hazardManager;
 
