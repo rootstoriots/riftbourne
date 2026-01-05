@@ -78,6 +78,14 @@ namespace Riftbourne.Characters
             {
                 CancelSkillSelection();
             }
+
+            // SPACE or ENTER to end turn manually
+            if (Keyboard.current != null &&
+                (Keyboard.current.spaceKey.wasPressedThisFrame || Keyboard.current.enterKey.wasPressedThisFrame))
+            {
+                Debug.Log("Player manually ended turn");
+                turnManager.EndTurn();
+            }
         }
 
         private void HandleLeftClick()
@@ -105,22 +113,34 @@ namespace Riftbourne.Characters
                 return;
             }
 
-            // CASE 2: Clicked on enemy unit - melee attack
+            // CASE 2: Clicked on enemy unit - attack (melee or ranged)
             if (targetUnit != null && targetUnit != unit)
             {
+                if (unit.HasActedThisTurn)
+                {
+                    Debug.Log("You have already acted this turn!");
+                    return;
+                }
+
                 if (AttackAction.ExecuteMeleeAttack(unit, targetUnit))
                 {
-                    turnManager.EndTurn();
+                    unit.MarkAsActed();
                 }
                 return;
             }
 
             // CASE 3: Clicked on empty cell - move
+            if (unit.HasMovedThisTurn)
+            {
+                Debug.Log("You have already moved this turn!");
+                return;
+            }
+
             if (unit.CanMoveTo(targetX, targetY))
             {
                 Vector3 targetWorldPos = targetCell.WorldPosition;
                 unit.MoveTo(targetX, targetY, targetWorldPos);
-                turnManager.EndTurn();
+                // MarkAsMoved() is called automatically when movement completes (in Character.cs)
             }
             else
             {
@@ -162,6 +182,13 @@ namespace Riftbourne.Characters
 
         private void UseSelectedSkill(int targetX, int targetY, Unit targetUnit)
         {
+            // Check if already acted this turn
+            if (unit.HasActedThisTurn)
+            {
+                Debug.Log("You have already acted this turn!");
+                return;
+            }
+
             bool success = false;
 
             // Ground-targeted skill (Ignite Ground)
@@ -182,7 +209,7 @@ namespace Riftbourne.Characters
             if (success)
             {
                 CancelSkillSelection();
-                turnManager.EndTurn();
+                // Don't end turn automatically - let player decide!
             }
         }
 
@@ -195,5 +222,6 @@ namespace Riftbourne.Characters
             selectedSkill = null;
             awaitingSkillTarget = false;
         }
+
     }
 }

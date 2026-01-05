@@ -10,6 +10,8 @@ namespace Riftbourne.Characters
 {
     public class Unit : Character
     {
+        private GridManager gridManager;
+
         [Header("Combat Stats")]
         [SerializeField] private int maxHP = 100;
         [SerializeField] private int currentHP;
@@ -56,10 +58,19 @@ namespace Riftbourne.Characters
         public bool IsPlayerControlled => isPlayerControlled;
         public bool IsAlive => currentHP > 0;
 
+        // Action tracking for turn-based gameplay
+        public bool HasMovedThisTurn { get; private set; }
+        public bool HasActedThisTurn { get; private set; }
+
+        // Hazard damage tracking - only take damage once per hazard type per turn
+        private HashSet<HazardTile.HazardType> hazardsDamagedByThisTurn = new HashSet<HazardTile.HazardType>();
+
         private void Awake()
         {
             currentHP = maxHP;
+            gridManager = FindFirstObjectByType<GridManager>();
         }
+
 
         private void Start()
         {
@@ -92,6 +103,26 @@ namespace Riftbourne.Characters
         /// </summary>
         public void OnTurnStart()
         {
+            // Reset action flags at start of turn
+            HasMovedThisTurn = false;
+            HasActedThisTurn = false;
+            hazardsDamagedByThisTurn.Clear(); // Reset hazard damage tracking
+            Debug.Log($"{unitName} turn started - actions reset");
+
+            // Apply hazard damage if standing on hazard at turn start
+            GridManager gridManager = FindFirstObjectByType<GridManager>();
+            HazardManager hazardManager = FindFirstObjectByType<HazardManager>();
+
+            if (gridManager != null && hazardManager != null)
+            {
+                GridCell currentCell = gridManager.GetCell(GridX, GridY);
+                if (currentCell != null && currentCell.Hazard != null)
+                {
+                    Debug.Log($"[TURN START] {unitName} standing on {currentCell.Hazard.Type} hazard");
+                    hazardManager.ApplyHazardDamageToUnit(this, currentCell);
+                }
+            }
+
             // Apply burn damage if burning
             if (IsBurning)
             {
@@ -165,7 +196,6 @@ namespace Riftbourne.Characters
             if (distance > MovementRange) return false;
 
             // Check if target cell is occupied by another unit
-            GridManager gridManager = FindFirstObjectByType<GridManager>();
             if (gridManager != null)
             {
                 GridCell targetCell = gridManager.GetCell(targetX, targetY);
@@ -174,6 +204,7 @@ namespace Riftbourne.Characters
                     return false; // Cell occupied by another unit
                 }
             }
+
 
             return true;
         }
@@ -357,5 +388,40 @@ namespace Riftbourne.Characters
         }
 
         #endregion
+
+        /// <summary>
+        /// Mark that this unit has moved this turn.
+        /// </summary>
+        public void MarkAsMoved()
+        {
+            HasMovedThisTurn = true;
+            Debug.Log($"{unitName} has now moved this turn");
+        }
+
+        /// <summary>
+        /// Mark that this unit has taken an action (attack, skill, etc).
+        /// </summary>
+        public void MarkAsActed()
+        {
+            HasActedThisTurn = true;
+            Debug.Log($"{unitName} has now acted this turn");
+        }
+
+        /// <summary>
+        /// Check if this unit has already been damaged by this hazard type this turn.
+        /// </summary>
+        public bool HasBeenDamagedByHazard(HazardTile.HazardType hazardType)
+        {
+            return hazardsDamagedByThisTurn.Contains(hazardType);
+        }
+
+        /// <summary>
+        /// Mark that this unit has been damaged by a specific hazard type this turn.
+        /// </summary>
+        public void MarkDamagedByHazard(HazardTile.HazardType hazardType)
+        {
+            hazardsDamagedByThisTurn.Add(hazardType);
+            Debug.Log($"{unitName} marked as damaged by {hazardType} this turn");
+        }
     }
 }

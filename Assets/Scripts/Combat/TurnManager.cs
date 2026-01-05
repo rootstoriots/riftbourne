@@ -66,18 +66,6 @@ namespace Riftbourne.Combat
         {
             Debug.Log($"{CurrentUnit.UnitName} ended their turn.");
 
-            // Apply hazard damage to unit ending their turn (BEFORE moving to next unit)
-            if (hazardManager != null && CurrentUnit.IsAlive)
-            {
-                hazardManager.ApplyHazardDamage(CurrentUnit, CurrentUnit.GridX, CurrentUnit.GridY);
-            }
-
-            // Check if unit died from hazard damage
-            if (IsCombatOver())
-            {
-                return;
-            }
-
             // Move to next unit
             do
             {
@@ -120,10 +108,19 @@ namespace Riftbourne.Combat
                 return;
             }
 
-            // Auto-end turn for enemy units (until AI is implemented)
+            // Let AI take control of enemy units
             if (!CurrentUnit.IsPlayerControlled)
             {
-                Invoke(nameof(EndTurn), 0.5f);
+                AIController ai = CurrentUnit.GetComponent<AIController>();
+                if (ai != null)
+                {
+                    ai.TakeTurn();
+                }
+                else
+                {
+                    Debug.LogWarning($"{CurrentUnit.UnitName} has no AIController! Ending turn.");
+                    EndTurn();
+                }
             }
         }
 

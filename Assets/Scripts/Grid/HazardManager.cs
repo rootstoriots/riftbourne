@@ -55,7 +55,7 @@ namespace Riftbourne.Grid
             // Create horizontal quad ABOVE the ground plane
             GameObject fireQuad = GameObject.CreatePrimitive(PrimitiveType.Quad);
             fireQuad.name = $"Fire_{cell.X}_{cell.Y}";
-            fireQuad.transform.position = cell.WorldPosition + Vector3.up * 0.15f; // RAISED to 0.15
+            fireQuad.transform.position = cell.WorldPosition + Vector3.up * 0.03f;
             fireQuad.transform.rotation = Quaternion.Euler(90, 0, 0); // Horizontal
             fireQuad.transform.localScale = Vector3.one * 0.8f; // Slightly smaller so it's clearly on the cell
 
@@ -109,7 +109,7 @@ namespace Riftbourne.Grid
 
         /// <summary>
         /// Applies hazard damage to unit at specified position
-        /// Called by TurnManager when unit ends turn
+        /// Called by TurnManager when unit ends turn (DEPRECATED - keeping for compatibility)
         /// </summary>
         public void ApplyHazardDamage(Unit unit, int x, int y)
         {
@@ -117,14 +117,39 @@ namespace Riftbourne.Grid
                 return;
 
             GridCell cell = gridManager.GetCell(x, y);
+            ApplyHazardDamageToUnit(unit, cell);
+        }
 
-            if (cell.Hazard != null)
+        /// <summary>
+        /// Applies hazard damage to unit from a specific cell.
+        /// Only damages once per hazard type per turn.
+        /// </summary>
+        public void ApplyHazardDamageToUnit(Unit unit, GridCell cell)
+        {
+            Debug.Log($"[HAZARD DEBUG] ApplyHazardDamageToUnit called for {unit.UnitName} at cell ({cell.X}, {cell.Y})");
+
+            if (cell.Hazard == null)
             {
-                int damage = cell.Hazard.DamagePerTurn;
-                unit.TakeDamage(damage);
-
-                Debug.Log($"{unit.UnitName} takes {damage} {cell.Hazard.Type} damage at ({x}, {y})");
+                Debug.Log($"[HAZARD DEBUG] Cell has no hazard, returning");
+                return;
             }
+
+            Debug.Log($"[HAZARD DEBUG] Cell has {cell.Hazard.Type} hazard");
+
+            // Check if unit has already been damaged by this hazard type this turn
+            if (unit.HasBeenDamagedByHazard(cell.Hazard.Type))
+            {
+                Debug.Log($"{unit.UnitName} already took {cell.Hazard.Type} damage this turn, skipping");
+                return;
+            }
+
+            // Apply damage
+            int damage = cell.Hazard.DamagePerTurn;
+            Debug.Log($"[HAZARD DEBUG] About to apply {damage} damage to {unit.UnitName}");
+            unit.TakeDamage(damage);
+            unit.MarkDamagedByHazard(cell.Hazard.Type);
+
+            Debug.Log($"{unit.UnitName} takes {damage} {cell.Hazard.Type} damage at ({cell.X}, {cell.Y})");
         }
 
         /// <summary>

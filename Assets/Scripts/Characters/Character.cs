@@ -1,5 +1,6 @@
 using UnityEngine;
 using Riftbourne.Grid;
+using System;
 
 namespace Riftbourne.Characters
 {
@@ -25,6 +26,11 @@ namespace Riftbourne.Characters
 
         // Movement state
         private Vector3 targetPosition;
+        private Action onMovementComplete; // Callback when movement finishes
+        private int destinationGridX;  // Where we're moving TO
+        private int destinationGridY;  // Where we're moving TO
+        private int lastCellX;  // Last cell we checked for hazards
+        private int lastCellY;
 
         private void Update()
         {
@@ -49,15 +55,21 @@ namespace Riftbourne.Characters
         /// <summary>
         /// Initiates movement to a new grid position
         /// </summary>
-        public void MoveTo(int x, int y, Vector3 worldPosition)
+        /// <param name="onComplete">Optional callback when movement finishes</param>
+        public void MoveTo(int x, int y, Vector3 worldPosition, Action onComplete = null)
         {
-            UpdateGridOccupancy(x, y);
-            gridX = x;
-            gridY = y;
+            // Store destination but DON'T update gridX/gridY yet
+            destinationGridX = x;
+            destinationGridY = y;
             targetPosition = worldPosition + Vector3.up * 0.5f;
             IsMoving = true;
+            onMovementComplete = onComplete;
 
-            Debug.Log($"{characterName} moving to grid position ({x}, {y})");
+            // Track where we started for hazard checking
+            lastCellX = gridX;
+            lastCellY = gridY;
+
+            Debug.Log($"{characterName} moving from ({gridX}, {gridY}) to ({x}, {y})");
         }
 
         /// <summary>
@@ -71,12 +83,63 @@ namespace Riftbourne.Characters
                 moveSpeed * Time.deltaTime
             );
 
-            // Check if we've arrived
+            // Calculate current grid position based on actual world position
+            int currentGridX = Mathf.FloorToInt(transform.position.x);
+            int currentGridY = Mathf.FloorToInt(transform.position.z);
+
+            // Check if we crossed into a new cell during movement
+            if (currentGridX != lastCellX || currentGridY != lastCellY)
+            {
+                // We entered a new cell!
+                Debug.Log($"[PATH] {characterName} crossed from ({lastCellX}, {lastCellY}) into ({currentGridX}, {currentGridY})");
+
+                Unit unit = GetComponent<Unit>();
+                if (unit != null)
+                {
+                    HazardManager hazardManager = FindFirstObjectByType<HazardManager>();
+                    GridManager gridManager = FindFirstObjectByType<GridManager>();
+
+                    if (hazardManager != null && gridManager != null &&
+                        gridManager.IsValidGridPosition(currentGridX, currentGridY))
+                    {
+                        GridCell enteredCell = gridManager.GetCell(currentGridX, currentGridY);
+                        if (enteredCell != null && enteredCell.Hazard != null)
+                        {
+                            Debug.Log($"[PATH] {unit.UnitName} takes hazard damage in cell ({currentGridX}, {currentGridY})");
+                            hazardManager.ApplyHazardDamageToUnit(unit, enteredCell);
+                        }
+                    }
+                }
+
+                // Update last cell position
+                lastCellX = currentGridX;
+                lastCellY = currentGridY;
+            }
+
+            // Check if we've arrived at final destination
             if (Vector3.Distance(transform.position, targetPosition) < 0.01f)
             {
                 transform.position = targetPosition;
                 IsMoving = false;
-                Debug.Log($"{characterName} arrived at destination");
+
+                // NOW update the grid position and occupancy
+                UpdateGridOccupancy(destinationGridX, destinationGridY);
+                gridX = destinationGridX;
+                gridY = destinationGridY;
+
+                Debug.Log($"{characterName} arrived at destination ({gridX}, {gridY})");
+
+                // Mark as moved (if this is a Unit)
+                Unit unit = GetComponent<Unit>();
+                if (unit != null)
+                {
+                    unit.MarkAsMoved();
+                }
+
+                // Trigger callback if one was provided
+                Action callback = onMovementComplete;
+                onMovementComplete = null; // Clear callback
+                callback?.Invoke();
             }
         }
 

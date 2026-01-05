@@ -54,6 +54,9 @@ namespace Riftbourne.Combat
             // Record skill usage for mastery progression
             user.RecordSkillUsage(skill);
 
+            // Mark that user has acted this turn
+            user.MarkAsActed();
+
             return true;
         }
 
@@ -101,6 +104,9 @@ namespace Riftbourne.Combat
 
             // Record skill usage for mastery progression
             user.RecordSkillUsage(skill);
+
+            // Mark that user has acted this turn
+            user.MarkAsActed();
 
             return true;
         }
