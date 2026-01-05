@@ -17,6 +17,7 @@ namespace Riftbourne.Characters
         [SerializeField] private int currentHP;
         [SerializeField] private int attackPower = 15;
         [SerializeField] private int defensePower = 5;
+        [SerializeField] private int initiative = 10; // For turn order (higher goes first)
 
         [Header("UI")]
         [SerializeField] private HPDisplay hpDisplay;
@@ -54,6 +55,7 @@ namespace Riftbourne.Characters
         public int CurrentHP => currentHP;
         public int AttackPower => attackPower;
         public int DefensePower => defensePower;
+        public int Initiative => initiative;
         public string UnitName => unitName;
         public bool IsPlayerControlled => isPlayerControlled;
         public bool IsAlive => currentHP > 0;
@@ -74,15 +76,26 @@ namespace Riftbourne.Characters
 
         private void Start()
         {
+            GridManager gridManager = FindFirstObjectByType<GridManager>();
+            
             // Initialize grid position based on world position
             int startX = Mathf.FloorToInt(transform.position.x);
             int startY = Mathf.FloorToInt(transform.position.z);
 
-            GridManager gridManager = FindFirstObjectByType<GridManager>();
             if (gridManager != null && gridManager.IsValidGridPosition(startX, startY))
             {
-                SetGridPosition(startX, startY, new Vector3(startX, 0, startY));
-                Debug.Log($"{unitName} initialized at grid position ({startX}, {startY})");
+                // Get the proper centered world position from the grid cell
+                GridCell cell = gridManager.GetCell(startX, startY);
+                if (cell != null)
+                {
+                    Vector3 centeredPosition = cell.WorldPosition;
+                    centeredPosition.y = 0.5f; // Keep unit elevated
+                    
+                    SetGridPosition(startX, startY, centeredPosition);
+                    transform.position = centeredPosition; // Snap to cell center
+                    
+                    Debug.Log($"{unitName} initialized at grid position ({startX}, {startY}) - world pos: {centeredPosition}");
+                }
             }
             else
             {

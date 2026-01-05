@@ -5,6 +5,7 @@ using Riftbourne.Characters;
 using Riftbourne.Combat;
 using Riftbourne.Skills;
 using Riftbourne.Grid;
+using Riftbourne.Core;
 using System.Collections.Generic;
 
 namespace Riftbourne.UI
@@ -65,22 +66,39 @@ namespace Riftbourne.UI
         {
             UpdateCurrentUnit();
             UpdateButtonStates();
+            
+            // Update stats display every frame to show real-time HP/action changes
+            if (currentUnit != null && currentUnitText != null)
+            {
+                UpdateUnitStatsDisplay();
+            }
         }
 
         private void UpdateCurrentUnit()
         {
-            if (turnManager == null) return;
+            // Track the SELECTED unit from PartyManager, not just the current turn unit
+            Unit newUnit = null;
+            
+            if (PartyManager.Instance != null)
+            {
+                newUnit = PartyManager.Instance.SelectedUnit;
+            }
+            
+            // Fallback to TurnManager's current unit if no selection
+            if (newUnit == null && turnManager != null)
+            {
+                newUnit = turnManager.CurrentUnit;
+            }
 
-            Unit newUnit = turnManager.CurrentUnit;
             if (newUnit != currentUnit)
             {
                 currentUnit = newUnit;
                 currentController = currentUnit?.GetComponent<CharacterMovementController>();
 
-                // Update unit name display
+                // Update unit stats display
                 if (currentUnitText != null && currentUnit != null)
                 {
-                    currentUnitText.text = $"Current Unit: {currentUnit.UnitName}";
+                    UpdateUnitStatsDisplay();
                 }
 
                 // Close skills menu when unit changes
@@ -94,9 +112,20 @@ namespace Riftbourne.UI
 
         private void UpdateButtonStates()
         {
-            if (currentUnit == null || !currentUnit.IsPlayerControlled)
+            // Check if current unit is valid and in the active turn window
+            bool canAct = false;
+            
+            if (currentUnit != null && currentUnit.IsPlayerControlled)
             {
-                // Disable all buttons during enemy turn
+                if (turnManager != null && turnManager.IsUnitInCurrentWindow(currentUnit))
+                {
+                    canAct = true;
+                }
+            }
+
+            if (!canAct)
+            {
+                // Disable all buttons if not player's turn or not in window
                 SetButtonInteractable(moveButton, false);
                 SetButtonInteractable(attackButton, false);
                 SetButtonInteractable(skillsButton, false);
@@ -275,6 +304,26 @@ namespace Riftbourne.UI
                     skillsMenuOpen = false;
                 }
             }
+        }
+
+        /// <summary>
+        /// Update the unit stats display text with HP and action economy.
+        /// </summary>
+        private void UpdateUnitStatsDisplay()
+        {
+            if (currentUnit == null || currentUnitText == null) return;
+
+            // Build status text
+            string statusText = $"<b>{currentUnit.UnitName}</b>\n";
+            statusText += $"HP: {currentUnit.CurrentHP}/{currentUnit.MaxHP}";
+            
+            // Show action status
+            string moveStatus = currentUnit.HasMovedThisTurn ? "<color=red>Used</color>" : "<color=green>Ready</color>";
+            string actStatus = currentUnit.HasActedThisTurn ? "<color=red>Used</color>" : "<color=green>Ready</color>";
+            
+            statusText += $"\nMove: {moveStatus}  |  Action: {actStatus}";
+
+            currentUnitText.text = statusText;
         }
     }
 }

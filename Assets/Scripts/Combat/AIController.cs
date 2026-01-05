@@ -41,8 +41,7 @@ namespace Riftbourne.Combat
         {
             if (controlledUnit == null || !controlledUnit.IsAlive)
             {
-                Debug.LogWarning("AIController: Unit is null or dead, ending turn immediately");
-                turnManager.EndTurn();
+                Debug.LogWarning("AIController: Unit is null or dead, skipping turn");
                 return;
             }
 
@@ -62,8 +61,7 @@ namespace Riftbourne.Combat
 
             if (targetEnemy == null)
             {
-                Debug.Log("[AI] No valid targets found, ending turn");
-                turnManager.EndTurn();
+                Debug.Log("[AI] No valid targets found, skipping turn");
                 return;
             }
 
@@ -82,9 +80,7 @@ namespace Riftbourne.Combat
                 {
                     // Movement complete - try to attack
                     AttackAction.ExecuteMeleeAttack(controlledUnit, targetEnemy);
-
-                    // End turn after actions complete
-                    turnManager.EndTurn();
+                    // Turn ends when window advances (handled by TurnManager)
                 });
             }
             else
@@ -92,7 +88,7 @@ namespace Riftbourne.Combat
                 // Can't move or already in best position - just attack
                 Debug.Log("[AI] Staying in place, attacking");
                 AttackAction.ExecuteMeleeAttack(controlledUnit, targetEnemy);
-                turnManager.EndTurn();
+                // Turn ends when window advances (handled by TurnManager)
             }
         }
 

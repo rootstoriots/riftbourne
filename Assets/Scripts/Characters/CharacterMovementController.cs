@@ -3,6 +3,7 @@ using UnityEngine.InputSystem;
 using Riftbourne.Grid;
 using Riftbourne.Combat;
 using Riftbourne.Skills;
+using Riftbourne.Core;
 using System.Collections.Generic;
 
 namespace Riftbourne.Characters
@@ -38,10 +39,23 @@ namespace Riftbourne.Characters
 
         private void Update()
         {
-            // Only process input during this unit's turn
-            if (turnManager == null || turnManager.CurrentUnit != unit)
+            // Only process input if this unit is the currently selected party member
+            if (PartyManager.Instance == null || PartyManager.Instance.SelectedUnit != unit)
             {
                 return;
+            }
+
+            // Only process input if this unit is in the current turn window
+            if (turnManager == null || !turnManager.IsUnitInCurrentWindow(unit))
+            {
+                Debug.LogWarning($"{unit.UnitName}: Not in current turn window, cannot act");
+                return;
+            }
+
+            // DEBUG: Log that this unit is actively listening for input
+            if (Mouse.current.leftButton.wasPressedThisFrame || Mouse.current.rightButton.wasPressedThisFrame)
+            {
+                Debug.Log($"[INPUT] {unit.UnitName} is listening for input (selected and in window)");
             }
 
             // Number key selection (1-9) when skill menu is open
@@ -106,6 +120,14 @@ namespace Riftbourne.Characters
             GridCell targetCell = gridManager.GetCell(targetX, targetY);
             Unit targetUnit = targetCell.OccupyingUnit;
 
+            // CASE 0: Clicked on a player unit - select it for control
+            if (targetUnit != null && targetUnit.IsPlayerControlled && targetUnit != unit)
+            {
+                PartyManager.Instance?.SelectUnit(targetUnit);
+                Debug.Log($"Selected {targetUnit.UnitName} for control");
+                return;
+            }
+
             // CASE 1: Using a selected skill
             if (awaitingSkillTarget && selectedSkill != null)
             {
@@ -133,6 +155,13 @@ namespace Riftbourne.Characters
             if (unit.HasMovedThisTurn)
             {
                 Debug.Log("You have already moved this turn!");
+                return;
+            }
+
+            // Check if clicking on current position - don't count as movement
+            if (targetX == unit.GridX && targetY == unit.GridY)
+            {
+                Debug.Log("Already at that position!");
                 return;
             }
 
@@ -171,6 +200,58 @@ namespace Riftbourne.Characters
             // Set flag to listen for number keys
             awaitingSkillTarget = true;
             selectedSkill = null; // Don't auto-select!
+        }
+
+        /// <summary>
+        /// Public property to check if a skill is currently selected.
+        /// </summary>
+        public bool IsSkillSelected => selectedSkill != null;
+
+        /// <summary>
+        /// Public method for clicking enemies to use skills on them.
+        /// </summary>
+        public void UseSkillOnTarget(Unit targetUnit)
+        {
+            if (selectedSkill == null || !awaitingSkillTarget)
+            {
+                Debug.LogWarning("No skill selected!");
+                return;
+            }
+
+            if (unit.HasActedThisTurn)
+            {
+                Debug.Log("You have already acted this turn!");
+                return;
+            }
+
+            if (selectedSkill.CreatesGroundHazard)
+            {
+                Debug.Log($"{selectedSkill.SkillName} requires ground target, not unit target!");
+                return;
+            }
+
+            bool success = SkillExecutor.ExecuteSkill(selectedSkill, unit, targetUnit);
+            if (success)
+            {
+                CancelSkillSelection();
+            }
+        }
+
+        /// <summary>
+        /// Public method for clicking enemies to attack them.
+        /// </summary>
+        public void AttemptAttackOnTarget(Unit targetUnit)
+        {
+            if (unit.HasActedThisTurn)
+            {
+                Debug.Log("You have already acted this turn!");
+                return;
+            }
+
+            if (AttackAction.ExecuteMeleeAttack(unit, targetUnit))
+            {
+                unit.MarkAsActed();
+            }
         }
 
         /// <summary>

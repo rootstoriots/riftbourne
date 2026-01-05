@@ -79,7 +79,12 @@ namespace Riftbourne.Grid
             {
                 for (int y = 0; y < gridHeight; y++)
                 {
-                    Vector3 worldPosition = new Vector3(x * cellSize, 0, y * cellSize);
+                    // Center cells within grid squares (0.5, 1.5, 2.5, etc.)
+                    Vector3 worldPosition = new Vector3(
+                        x * cellSize + cellSize * 0.5f, 
+                        0, 
+                        y * cellSize + cellSize * 0.5f
+                    );
                     grid[x, y] = new GridCell(x, y, worldPosition);
                 }
             }

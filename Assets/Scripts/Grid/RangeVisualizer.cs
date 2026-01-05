@@ -24,7 +24,7 @@ namespace Riftbourne.Grid
 
             foreach (GridCell cell in cells)
             {
-                CreateHighlight(cell, movementRangeMaterial, 0.05f);
+                CreateHighlight(cell, movementRangeMaterial, 0.04f);
             }
 
             Debug.Log($"RangeVisualizer: Showing {cells.Count} movement cells");
@@ -39,7 +39,7 @@ namespace Riftbourne.Grid
 
             foreach (GridCell cell in cells)
             {
-                CreateHighlight(cell, attackRangeMaterial, 0.05f);
+                CreateHighlight(cell, attackRangeMaterial, 0.04f);
             }
 
             Debug.Log($"RangeVisualizer: Showing {cells.Count} attack cells");
@@ -66,11 +66,11 @@ namespace Riftbourne.Grid
             highlight.name = $"RangeHighlight_{cell.X}_{cell.Y}";
             highlight.transform.SetParent(transform);
 
-            // Position slightly above ground
+            // Position at cell center (WorldPosition is already centered)
             highlight.transform.position = new Vector3(
-                cell.WorldPosition.x + 0.5f,
+                cell.WorldPosition.x,
                 yOffset,
-                cell.WorldPosition.z + 0.5f
+                cell.WorldPosition.z
             );
 
             // Rotate to be horizontal
