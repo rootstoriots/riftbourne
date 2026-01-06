@@ -134,7 +134,7 @@ namespace Riftbourne.UI
             }
 
             // Enable/disable based on action economy
-            SetButtonInteractable(moveButton, !currentUnit.HasMovedThisTurn);
+            SetButtonInteractable(moveButton, currentUnit.MovementPointsRemaining > 0);
             SetButtonInteractable(attackButton, !currentUnit.HasActedThisTurn);
             SetButtonInteractable(skillsButton, !currentUnit.HasActedThisTurn);
             SetButtonInteractable(endTurnButton, true); // Always can end turn
@@ -155,10 +155,10 @@ namespace Riftbourne.UI
 
             if (currentUnit != null && gridManager != null)
             {
+                // Use pathfinding-aware ShowMovementRange
                 gridManager.ShowMovementRange(
-                    currentUnit.GridX,
-                    currentUnit.GridY,
-                    currentUnit.MovementRange
+                    currentUnit,  // Pass the unit for pathfinding
+                    currentUnit.MovementPointsRemaining  // Show remaining, not max
                 );
             }
         }
@@ -314,14 +314,24 @@ namespace Riftbourne.UI
             if (currentUnit == null || currentUnitText == null) return;
 
             // Build status text
-            string statusText = $"<b>{currentUnit.UnitName}</b>\n";
+            string statusText = $"<b>{currentUnit.UnitName}</b> - Lv.{currentUnit.Level}\n";
             statusText += $"HP: {currentUnit.CurrentHP}/{currentUnit.MaxHP}";
             
-            // Show action status
-            string moveStatus = currentUnit.HasMovedThisTurn ? "<color=red>Used</color>" : "<color=green>Ready</color>";
-            string actStatus = currentUnit.HasActedThisTurn ? "<color=red>Used</color>" : "<color=green>Ready</color>";
+            // Show XP progress
+            int xpNeeded = currentUnit.GetXPRequiredForNextLevel();
+            statusText += $" | XP: {currentUnit.CurrentXP}/{xpNeeded}";
             
-            statusText += $"\nMove: {moveStatus}  |  Action: {actStatus}";
+            // Show SP if any
+            if (currentUnit.SkillPoints > 0)
+            {
+                statusText += $" | SP: {currentUnit.SkillPoints}";
+            }
+            
+            // Show movement points and action status
+            statusText += $"\nMove: {currentUnit.MovementPointsRemaining}";
+            
+            string actStatus = currentUnit.HasActedThisTurn ? "<color=red>Used</color>" : "<color=green>Ready</color>";
+            statusText += $"  |  Action: {actStatus}";
 
             currentUnitText.text = statusText;
         }

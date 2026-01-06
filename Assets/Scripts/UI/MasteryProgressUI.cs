@@ -97,33 +97,25 @@ namespace Riftbourne.UI
                 return;
             }
 
-            string displayText = "LEARNING PROGRESS:\n\n";
+            string displayText = $"SKILL PROGRESS (SP: {trackedUnit.SkillPoints}):\n\n";
             Color textColor = Color.white;
 
             foreach (var skill in availableSkills)
             {
-                SkillMastery mastery = trackedUnit.GetMasteryProgress(skill);
+                bool isMastered = trackedUnit.IsSkillMastered(skill);
 
-                if (mastery != null)
+                if (isMastered)
                 {
-                    if (mastery.isMastered)
-                    {
-                        displayText += $"✓ {skill.SkillName}: MASTERED!\n";
-                        textColor = Color.green; // If any skill is mastered, make whole panel green
-                    }
-                    else
-                    {
-                        displayText += $"{skill.SkillName}: {mastery.usageCount}/{mastery.masteryThreshold}\n";
-                        if (textColor != Color.green) // Keep green if something is mastered
-                        {
-                            textColor = Color.cyan;
-                        }
-                    }
+                    displayText += $"✓ {skill.SkillName}: MASTERED!\n";
+                    textColor = Color.green; // If any skill is mastered, make whole panel green
                 }
                 else
                 {
-                    // Skill is known but not being tracked for mastery
-                    displayText += $"{skill.SkillName}: Known\n";
+                    displayText += $"{skill.SkillName}: {skill.MasteryCost} SP to master\n";
+                    if (textColor != Color.green) // Keep green if something is mastered
+                    {
+                        textColor = Color.cyan;
+                    }
                 }
             }
 

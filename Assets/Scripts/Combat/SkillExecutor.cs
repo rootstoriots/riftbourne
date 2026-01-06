@@ -38,10 +38,11 @@ namespace Riftbourne.Combat
 
             Debug.Log($"{user.UnitName} casts {skill.SkillName} on {target.UnitName}!");
 
-            // Apply damage
-            if (skill.BaseDamage > 0)
+            // Calculate and apply damage (includes stat scaling)
+            int damage = skill.CalculateDamage(user);
+            if (damage > 0)
             {
-                int actualDamage = target.TakeDamage(skill.BaseDamage);
+                int actualDamage = target.TakeDamage(damage);
                 Debug.Log($"{skill.SkillName} deals {actualDamage} damage!");
             }
 
@@ -51,8 +52,15 @@ namespace Riftbourne.Combat
                 target.ApplyBurn(skill.BurnDamagePerTurn, skill.BurnDuration);
             }
 
-            // Record skill usage for mastery progression
-            user.RecordSkillUsage(skill);
+            // Record action and award XP
+            user.RecordAction();  // Award SP based on action count
+            user.AwardXP(5);
+            
+            // Award bonus XP if target died
+            if (!target.IsAlive)
+            {
+                user.AwardXP(25);  // Kill bonus
+            }
 
             // Mark that user has acted this turn
             user.MarkAsActed();
@@ -102,8 +110,9 @@ namespace Riftbourne.Combat
                 hazardManager.CreateFireHazard(targetX, targetY, skill.HazardDamagePerTurn, skill.HazardDuration);
             }
 
-            // Record skill usage for mastery progression
-            user.RecordSkillUsage(skill);
+            // Record action and award XP
+            user.RecordAction();  // Award SP based on action count
+            user.AwardXP(5);  // Award XP for successful skill use
 
             // Mark that user has acted this turn
             user.MarkAsActed();

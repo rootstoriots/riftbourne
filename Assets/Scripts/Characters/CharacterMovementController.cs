@@ -152,12 +152,6 @@ namespace Riftbourne.Characters
             }
 
             // CASE 3: Clicked on empty cell - move
-            if (unit.HasMovedThisTurn)
-            {
-                Debug.Log("You have already moved this turn!");
-                return;
-            }
-
             // Check if clicking on current position - don't count as movement
             if (targetX == unit.GridX && targetY == unit.GridY)
             {
@@ -165,15 +159,58 @@ namespace Riftbourne.Characters
                 return;
             }
 
+            // Calculate distance to target
+            int distance = Mathf.Abs(targetX - unit.GridX) + Mathf.Abs(targetY - unit.GridY);
+
+            // Check if we have enough movement points
+            if (distance > unit.MovementPointsRemaining)
+            {
+                Debug.Log($"Not enough movement! Need {distance}, have {unit.MovementPointsRemaining}");
+                return;
+            }
+            
+            // Check if DESTINATION cell is occupied (can't end movement on occupied cell)
+            if (targetCell.OccupyingUnit != null && targetCell.OccupyingUnit != unit)
+            {
+                Debug.Log($"Cannot move to ({targetX}, {targetY}) - occupied by {targetCell.OccupyingUnit.UnitName}!");
+                return;
+            }
+
+            // Check if path is valid (can pass through allies but not enemies)
             if (unit.CanMoveTo(targetX, targetY))
             {
                 Vector3 targetWorldPos = targetCell.WorldPosition;
-                unit.MoveTo(targetX, targetY, targetWorldPos);
-                // MarkAsMoved() is called automatically when movement completes (in Character.cs)
+                int movementCost = distance;
+
+                // Clear range visualizer when starting movement
+                if (gridManager != null)
+                {
+                    gridManager.ClearRangeHighlights();
+                }
+
+                // Get the actual path to follow
+                List<GridCell> path = gridManager.GetPath(unit, targetX, targetY);
+                
+                // Start moving - points will be spent when movement completes
+                unit.MoveTo(targetX, targetY, targetWorldPos, () => 
+                {
+                    // Movement complete callback
+                    unit.SpendMovementPoints(movementCost);
+                    
+                    // Re-show movement range at new position with remaining points
+                    if (gridManager != null && unit.MovementPointsRemaining > 0)
+                    {
+                        gridManager.ShowMovementRange(
+                            unit,  // Pass the unit for pathfinding
+                            unit.MovementPointsRemaining  // Show remaining movement, not max
+                        );
+                        Debug.Log($"Movement range updated - showing {unit.MovementPointsRemaining} remaining movement");
+                    }
+                }, path);  // Pass the path!
             }
             else
             {
-                Debug.Log("Cannot move there - out of range or cell occupied");
+                Debug.Log("Cannot move there - path blocked by enemies");
             }
         }
 

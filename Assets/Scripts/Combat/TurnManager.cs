@@ -72,14 +72,14 @@ namespace Riftbourne.Combat
                 allUnits = new List<Unit>();
                 allUnits.AddRange(foundUnits);
 
-                // Sort by Initiative (higher goes first)
-                // Tiebreaker: Player-controlled units go first if initiative is tied
+                // Sort by Speed (higher goes first)
+                // Tiebreaker: Player-controlled units go first if speed is tied
                 allUnits.Sort((a, b) => 
                 {
-                    int initiativeCompare = b.Initiative.CompareTo(a.Initiative);
-                    if (initiativeCompare != 0)
-                        return initiativeCompare;
-                    // Tied initiative - player units go first
+                    int speedCompare = b.Speed.CompareTo(a.Speed);
+                    if (speedCompare != 0)
+                        return speedCompare;
+                    // Tied speed - player units go first
                     return b.IsPlayerControlled.CompareTo(a.IsPlayerControlled);
                 });
             }
@@ -88,7 +88,7 @@ namespace Riftbourne.Combat
                 Debug.Log("Using pre-configured turn order from Inspector");
             }
 
-            Debug.Log($"TurnManager: Turn order: {string.Join(", ", allUnits.Select(u => $"{u.UnitName}(Init:{u.Initiative})"))}");
+            Debug.Log($"TurnManager: Turn order: {string.Join(", ", allUnits.Select(u => $"{u.UnitName}(Speed:{u.Speed})"))}");
 
             if (allUnits.Count > 0)
             {

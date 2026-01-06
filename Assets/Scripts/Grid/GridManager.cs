@@ -23,6 +23,7 @@ namespace Riftbourne.Grid
         // Grid data
         private GridCell[,] grid;
         private GameObject gridVisualsParent;
+        private Pathfinding pathfinding;
 
         // Selection
         private GridCell selectedCell;
@@ -52,6 +53,7 @@ namespace Riftbourne.Grid
             inputActions = new PlayerInputActions();
 
             GenerateGrid();
+            pathfinding = new Pathfinding(this);
             CreateGridVisuals();
             CreateSelectionHighlight();
         }
@@ -228,7 +230,28 @@ namespace Riftbourne.Grid
             );
         }
         /// <summary>
+        /// Get all cells that are actually reachable within movement range.
+        /// Uses pathfinding to respect obstacles (enemies block, allies don't).
+        /// </summary>
+        public HashSet<GridCell> GetReachableCells(Characters.Unit unit, int range)
+        {
+            if (pathfinding == null) return new HashSet<GridCell>();
+            return pathfinding.GetReachableCells(unit, range);
+        }
+        
+        /// <summary>
+        /// Get the actual path to a destination.
+        /// Returns list of cells to visit in order.
+        /// </summary>
+        public List<GridCell> GetPath(Characters.Unit unit, int targetX, int targetY)
+        {
+            if (pathfinding == null) return null;
+            return pathfinding.GetPath(unit, targetX, targetY);
+        }
+        
+        /// <summary>
         /// Get all cells within movement range of a position.
+        /// DEPRECATED: Use GetReachableCells instead for proper pathfinding.
         /// </summary>
         public List<GridCell> GetCellsInMovementRange(int startX, int startY, int range)
         {
@@ -284,7 +307,20 @@ namespace Riftbourne.Grid
         }
 
         /// <summary>
-        /// Show movement range visualization.
+        /// Show movement range visualization using proper pathfinding.
+        /// </summary>
+        public void ShowMovementRange(Characters.Unit unit, int range)
+        {
+            if (rangeVisualizer == null) return;
+
+            HashSet<GridCell> reachableCells = GetReachableCells(unit, range);
+            List<GridCell> cellList = new List<GridCell>(reachableCells);
+            rangeVisualizer.ShowMovementRange(cellList);
+        }
+        
+        /// <summary>
+        /// Show movement range visualization (legacy - uses simple range check).
+        /// DEPRECATED: Use ShowMovementRange(Unit, int) instead.
         /// </summary>
         public void ShowMovementRange(int startX, int startY, int range)
         {

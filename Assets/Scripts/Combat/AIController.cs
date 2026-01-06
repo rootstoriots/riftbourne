@@ -208,26 +208,13 @@ namespace Riftbourne.Combat
 
         /// <summary>
         /// Get all cells this unit can legally move to.
+        /// Uses pathfinding to respect obstacles.
         /// </summary>
         private List<GridCell> GetValidMoves()
         {
-            List<GridCell> validCells = new List<GridCell>();
-
-            // Check all cells within movement range
-            for (int x = 0; x < gridManager.GridWidth; x++)
-            {
-                for (int y = 0; y < gridManager.GridHeight; y++)
-                {
-                    GridCell cell = gridManager.GetCell(x, y);
-                    if (cell != null && controlledUnit.CanMoveTo(cell.X, cell.Y))
-                    {
-                        validCells.Add(cell);
-                    }
-
-                }
-            }
-
-            return validCells;
+            // Use pathfinding to get all actually reachable cells
+            HashSet<GridCell> reachable = gridManager.GetReachableCells(controlledUnit, controlledUnit.MovementRange);
+            return new List<GridCell>(reachable);
         }
 
         /// <summary>
@@ -235,12 +222,16 @@ namespace Riftbourne.Combat
         /// </summary>
         private void MoveToCell(GridCell targetCell, System.Action onComplete = null)
         {
-            Vector3 targetPosition = new Vector3(targetCell.X, 0.5f, targetCell.Y);
+            // Get the actual path to follow
+            List<GridCell> path = gridManager.GetPath(controlledUnit, targetCell.X, targetCell.Y);
+            
+            // Use the GridCell's centered WorldPosition
+            Vector3 targetPosition = targetCell.WorldPosition;
 
-            // Use the Character's built-in smooth movement system with callback
-            controlledUnit.MoveTo(targetCell.X, targetCell.Y, targetPosition, onComplete);
+            // Use the Character's built-in smooth movement system with callback AND path
+            controlledUnit.MoveTo(targetCell.X, targetCell.Y, targetPosition, onComplete, path);
 
-            Debug.Log($"[AI] Initiated smooth move to ({targetCell.X}, {targetCell.Y})");
+            Debug.Log($"[AI] Initiated path-following move to ({targetCell.X}, {targetCell.Y})");
         }
 
         /// <summary>

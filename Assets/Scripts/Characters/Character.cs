@@ -1,6 +1,7 @@
 using UnityEngine;
 using Riftbourne.Grid;
 using System;
+using System.Collections.Generic;
 
 namespace Riftbourne.Characters
 {
@@ -15,7 +16,9 @@ namespace Riftbourne.Characters
 
         [Header("Movement")]
         [SerializeField] private int movementRange = 5;
-        [SerializeField] private float moveSpeed = 5f;
+        
+        // Visual movement speed (not gameplay-relevant, just animation)
+        private const float moveSpeed = 8f;
 
         // Public properties
         public string CharacterName => characterName;
@@ -31,6 +34,8 @@ namespace Riftbourne.Characters
         private int destinationGridY;  // Where we're moving TO
         private int lastCellX;  // Last cell we checked for hazards
         private int lastCellY;
+        private List<GridCell> currentPath; // Path to follow
+        private int currentPathIndex; // Which cell in path we're moving to
 
         private void Update()
         {
@@ -53,23 +58,37 @@ namespace Riftbourne.Characters
         }
 
         /// <summary>
-        /// Initiates movement to a new grid position
+        /// Initiates movement to a new grid position, optionally following a path.
         /// </summary>
+        /// <param name="path">Optional path to follow. If null, moves in straight line.</param>
         /// <param name="onComplete">Optional callback when movement finishes</param>
-        public void MoveTo(int x, int y, Vector3 worldPosition, Action onComplete = null)
+        public void MoveTo(int x, int y, Vector3 worldPosition, Action onComplete = null, List<GridCell> path = null)
         {
-            // Store destination but DON'T update gridX/gridY yet
+            // Store destination
             destinationGridX = x;
             destinationGridY = y;
-            targetPosition = worldPosition + Vector3.up * 0.5f;
-            IsMoving = true;
             onMovementComplete = onComplete;
-
+            
             // Track where we started for hazard checking
             lastCellX = gridX;
             lastCellY = gridY;
-
-            Debug.Log($"{characterName} moving from ({gridX}, {gridY}) to ({x}, {y})");
+            
+            // Setup path following or direct movement
+            if (path != null && path.Count > 0)
+            {
+                currentPath = path;
+                currentPathIndex = 0;
+                targetPosition = currentPath[0].WorldPosition + Vector3.up * 0.5f;
+                Debug.Log($"{characterName} following path of {currentPath.Count} cells to ({x}, {y})");
+            }
+            else
+            {
+                currentPath = null;
+                targetPosition = worldPosition + Vector3.up * 0.5f;
+                Debug.Log($"{characterName} moving directly to ({x}, {y})");
+            }
+            
+            IsMoving = true;
         }
 
         /// <summary>
@@ -116,30 +135,39 @@ namespace Riftbourne.Characters
                 lastCellY = currentGridY;
             }
 
-            // Check if we've arrived at final destination
+            // Check if we've arrived at current waypoint
             if (Vector3.Distance(transform.position, targetPosition) < 0.01f)
             {
                 transform.position = targetPosition;
-                IsMoving = false;
-
-                // NOW update the grid position and occupancy
-                UpdateGridOccupancy(destinationGridX, destinationGridY);
-                gridX = destinationGridX;
-                gridY = destinationGridY;
-
-                Debug.Log($"{characterName} arrived at destination ({gridX}, {gridY})");
-
-                // Mark as moved (if this is a Unit)
-                Unit unit = GetComponent<Unit>();
-                if (unit != null)
+                
+                // If following a path, move to next waypoint
+                if (currentPath != null && currentPathIndex < currentPath.Count - 1)
                 {
-                    unit.MarkAsMoved();
+                    currentPathIndex++;
+                    targetPosition = currentPath[currentPathIndex].WorldPosition + Vector3.up * 0.5f;
+                    Debug.Log($"[PATH] {characterName} reached waypoint {currentPathIndex}/{currentPath.Count}, continuing to next");
                 }
+                else
+                {
+                    // Reached final destination
+                    IsMoving = false;
 
-                // Trigger callback if one was provided
-                Action callback = onMovementComplete;
-                onMovementComplete = null; // Clear callback
-                callback?.Invoke();
+                    // NOW update the grid position and occupancy
+                    UpdateGridOccupancy(destinationGridX, destinationGridY);
+                    gridX = destinationGridX;
+                    gridY = destinationGridY;
+
+                    Debug.Log($"{characterName} arrived at final destination ({gridX}, {gridY})");
+
+                    // Clear path
+                    currentPath = null;
+                    currentPathIndex = 0;
+                    
+                    // Trigger callback if one was provided
+                    Action callback = onMovementComplete;
+                    onMovementComplete = null; // Clear callback
+                    callback?.Invoke();
+                }
             }
         }
 

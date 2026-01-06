@@ -41,6 +41,16 @@ namespace Riftbourne.Combat
             Debug.Log($"{attacker.UnitName} attacks {target.UnitName}!");
             int damageDealt = target.TakeDamage(attacker.AttackPower);
             Debug.Log($"Attack dealt {damageDealt} damage!");
+            
+            // Record action and award XP
+            attacker.RecordAction();  // Award SP based on action count
+            attacker.AwardXP(5);
+            
+            // Award bonus XP if target died
+            if (!target.IsAlive)
+            {
+                attacker.AwardXP(25);  // Kill bonus
+            }
 
             return true;
         }
