@@ -10,8 +10,6 @@ namespace Riftbourne.Characters
 {
     public class Unit : Character
     {
-        private GridManager gridManager;
-
         [Header("Combat Stats")]
         [SerializeField] private int maxHP = 100;
         [SerializeField] private int currentHP;
@@ -107,7 +105,13 @@ namespace Riftbourne.Characters
         private void Awake()
         {
             currentHP = maxHP;
-            gridManager = FindFirstObjectByType<GridManager>();
+            
+            // Initialize manager references if not already set by base class
+            // (Base class Character.Awake() should have already set these, but ensure they're set)
+            if (gridManager == null)
+                gridManager = FindFirstObjectByType<GridManager>();
+            if (hazardManager == null)
+                hazardManager = FindFirstObjectByType<HazardManager>();
             
             // Initialize movement points
             MovementPointsRemaining = MovementRange;
@@ -116,7 +120,7 @@ namespace Riftbourne.Characters
 
         private void Start()
         {
-            GridManager gridManager = FindFirstObjectByType<GridManager>();
+            // Use cached gridManager reference
             
             // Initialize grid position based on world position
             int startX = Mathf.FloorToInt(transform.position.x);
@@ -151,6 +155,13 @@ namespace Riftbourne.Characters
             if (accessory1 != null) EquipItem(accessory1, EquipmentSlot.Accessory1);
             if (accessory2 != null) EquipItem(accessory2, EquipmentSlot.Accessory2);
             if (codex != null) EquipItem(codex, EquipmentSlot.Codex);
+
+            // Register with TurnManager if it exists (for late-spawning units)
+            TurnManager turnManager = FindFirstObjectByType<TurnManager>();
+            if (turnManager != null)
+            {
+                turnManager.RegisterUnit(this);
+            }
         }
 
         /// <summary>
@@ -165,9 +176,7 @@ namespace Riftbourne.Characters
             Debug.Log($"{unitName} turn started - Move: {MovementPointsRemaining}/{MaxMovementPoints}, actions reset");
 
             // Apply hazard damage if standing on hazard at turn start
-            GridManager gridManager = FindFirstObjectByType<GridManager>();
-            HazardManager hazardManager = FindFirstObjectByType<HazardManager>();
-
+            // Use cached manager references
             if (gridManager != null && hazardManager != null)
             {
                 GridCell currentCell = gridManager.GetCell(GridX, GridY);
@@ -199,7 +208,8 @@ namespace Riftbourne.Characters
         public int TakeDamage(int incomingAttack)
         {
             // Calculate damage: (Attack - Defense), minimum 1
-            int damage = Mathf.Max(1, incomingAttack - defensePower);
+            // Use DefensePower property to include equipment bonuses
+            int damage = Mathf.Max(1, incomingAttack - DefensePower);
 
             currentHP -= damage;
             currentHP = Mathf.Max(0, currentHP); // Don't go below 0

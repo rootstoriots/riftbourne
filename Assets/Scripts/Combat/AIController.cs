@@ -61,7 +61,12 @@ namespace Riftbourne.Combat
 
             if (targetEnemy == null)
             {
-                Debug.Log("[AI] No valid targets found, skipping turn");
+                Debug.Log("[AI] No valid targets found, ending turn");
+                // End turn even if no valid targets
+                if (turnManager != null)
+                {
+                    turnManager.EndTurn(controlledUnit);
+                }
                 return;
             }
 
@@ -79,16 +84,30 @@ namespace Riftbourne.Combat
                 MoveToCell(bestMoveCell, () =>
                 {
                     // Movement complete - try to attack
-                    AttackAction.ExecuteMeleeAttack(controlledUnit, targetEnemy);
-                    // Turn ends when window advances (handled by TurnManager)
+                    if (AttackAction.ExecuteMeleeAttack(controlledUnit, targetEnemy))
+                    {
+                        controlledUnit.MarkAsActed();
+                    }
+                    // End turn after action completes
+                    if (turnManager != null)
+                    {
+                        turnManager.EndTurn(controlledUnit);
+                    }
                 });
             }
             else
             {
                 // Can't move or already in best position - just attack
                 Debug.Log("[AI] Staying in place, attacking");
-                AttackAction.ExecuteMeleeAttack(controlledUnit, targetEnemy);
-                // Turn ends when window advances (handled by TurnManager)
+                if (AttackAction.ExecuteMeleeAttack(controlledUnit, targetEnemy))
+                {
+                    controlledUnit.MarkAsActed();
+                }
+                // End turn after action completes
+                if (turnManager != null)
+                {
+                    turnManager.EndTurn(controlledUnit);
+                }
             }
         }
 
@@ -213,6 +232,11 @@ namespace Riftbourne.Combat
         private List<GridCell> GetValidMoves()
         {
             // Use pathfinding to get all actually reachable cells
+            if (gridManager == null)
+            {
+                Debug.LogWarning("AIController: GridManager is null!");
+                return new List<GridCell>();
+            }
             HashSet<GridCell> reachable = gridManager.GetReachableCells(controlledUnit, controlledUnit.MovementRange);
             return new List<GridCell>(reachable);
         }
@@ -222,6 +246,12 @@ namespace Riftbourne.Combat
         /// </summary>
         private void MoveToCell(GridCell targetCell, System.Action onComplete = null)
         {
+            if (gridManager == null)
+            {
+                Debug.LogWarning("AIController: GridManager is null, cannot move!");
+                return;
+            }
+
             // Get the actual path to follow
             List<GridCell> path = gridManager.GetPath(controlledUnit, targetCell.X, targetCell.Y);
             

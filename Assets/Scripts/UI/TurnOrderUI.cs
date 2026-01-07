@@ -5,12 +5,13 @@ using Riftbourne.Combat;
 using Riftbourne.Core;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Riftbourne.UI
 {
     /// <summary>
-    /// Displays turn order at top-right with unit portraits.
-    /// Highlights the current unit.
+    /// Displays turn order based on actual turn sequence, not windows.
+    /// Shows which units have finished their turns and removes them from queue.
     /// </summary>
     public class TurnOrderUI : MonoBehaviour
     {
@@ -18,10 +19,19 @@ namespace Riftbourne.UI
         [SerializeField] private TurnManager turnManager;
 
         [Header("Layout")]
-        [SerializeField] private float portraitSize = 80f;
+        [SerializeField] private float portraitSize = 70f;
         [SerializeField] private float portraitSpacing = 10f;
+        [SerializeField] private float leftPadding = 183.33f;
+        [SerializeField] private float rightPadding = 128.33f;
+        [SerializeField] private float topPadding = 15f;
+        [SerializeField] private float bottomPadding = 15f;
+
+        [Header("Animation")]
+        [SerializeField] private float animationDuration = 0.3f;
 
         private List<TurnOrderPortrait> portraits = new List<TurnOrderPortrait>();
+        private HashSet<Unit> lastKnownFinishedUnits = new HashSet<Unit>();
+        private bool isAnimating = false;
 
         private class TurnOrderPortrait
         {
@@ -36,11 +46,8 @@ namespace Riftbourne.UI
 
         private void Start()
         {
-            Debug.Log("TurnOrderUI: Start() called");
-
             if (turnManager == null)
             {
-                Debug.Log("TurnOrderUI: TurnManager was null, finding it...");
                 turnManager = FindFirstObjectByType<TurnManager>();
             }
 
@@ -50,90 +57,269 @@ namespace Riftbourne.UI
                 return;
             }
 
-            Debug.Log($"TurnOrderUI: TurnManager found: {turnManager.name}");
-
-            // Wait one frame for TurnManager to initialize its units list
-            StartCoroutine(CreateTurnOrderDelayed());
+            StartCoroutine(InitializeDelayed());
         }
 
-        private IEnumerator CreateTurnOrderDelayed()
+        private IEnumerator InitializeDelayed()
         {
-            Debug.Log("TurnOrderUI: Waiting one frame for TurnManager to initialize...");
-            yield return null; // Wait one frame
-
-            CreateTurnOrderDisplay();
+            yield return null;
+            CreateAllPortraits();
+            UpdateTurnOrderLayout(immediate: true);
         }
 
         private void Update()
         {
             UpdateHighlights();
+            CheckForFinishedUnitsChange();
         }
 
-        private void CreateTurnOrderDisplay()
+        /// <summary>
+        /// Track which units have finished their turns by checking who's NOT in the current window anymore.
+        /// </summary>
+        private HashSet<Unit> GetFinishedUnits()
         {
-            Debug.Log("TurnOrderUI: CreateTurnOrderDisplay() called");
+            HashSet<Unit> finishedUnits = new HashSet<Unit>();
 
-            if (turnManager == null)
+            if (turnManager == null) return finishedUnits;
+
+            List<Unit> fullTurnOrder = turnManager.GetTurnOrder();
+            List<Unit> currentWindow = turnManager.GetCurrentTurnWindow();
+            int windowStartIndex = turnManager.GetCurrentTurnIndex();
+
+            // All units BEFORE the current window start have finished
+            for (int i = 0; i < windowStartIndex; i++)
             {
-                Debug.LogError("TurnOrderUI: TurnManager is null in CreateTurnOrderDisplay!");
-                return;
+                finishedUnits.Add(fullTurnOrder[i]);
             }
+
+            // Units AT or AFTER window start but NOT in current window have finished
+            // (These are units who were in the window but ended their turn)
+            for (int i = windowStartIndex; i < fullTurnOrder.Count; i++)
+            {
+                Unit unit = fullTurnOrder[i];
+                if (!currentWindow.Contains(unit))
+                {
+                    finishedUnits.Add(unit);
+                }
+            }
+
+            return finishedUnits;
+        }
+
+        /// <summary>
+        /// Check if the set of finished units has changed.
+        /// </summary>
+        private void CheckForFinishedUnitsChange()
+        {
+            if (turnManager == null || isAnimating) return;
+
+            HashSet<Unit> currentFinished = GetFinishedUnits();
+
+            if (!currentFinished.SetEquals(lastKnownFinishedUnits))
+            {
+                Debug.Log($"Finished units changed from {lastKnownFinishedUnits.Count} to {currentFinished.Count}");
+                Debug.Log($"  Finished: [{string.Join(", ", currentFinished.Select(u => u.UnitName))}]");
+
+                lastKnownFinishedUnits = new HashSet<Unit>(currentFinished);
+                UpdateTurnOrderLayout(immediate: false);
+            }
+        }
+
+        private void CreateAllPortraits()
+        {
+            if (turnManager == null) return;
 
             List<Unit> units = turnManager.GetAllUnits();
-            Debug.Log($"TurnOrderUI: Got {units.Count} units from TurnManager");
+            Debug.Log($"TurnOrderUI: Creating {units.Count} portraits");
 
-            // Auto-scale portrait size based on unit count
-            float scaledPortraitSize = portraitSize;
-            if (units.Count > 10)
+            foreach (Unit unit in units)
             {
-                // Shrink portraits for large battles
-                scaledPortraitSize = Mathf.Max(50f, portraitSize * (10f / units.Count));
-                Debug.Log($"TurnOrderUI: Scaled portrait size from {portraitSize} to {scaledPortraitSize} for {units.Count} units");
+                CreatePortrait(unit);
             }
-
-            // Calculate required width and adjust parent RectTransform
-            float requiredWidth = units.Count * (scaledPortraitSize + portraitSpacing);
-            RectTransform parentRect = GetComponent<RectTransform>();
-            if (parentRect != null)
-            {
-                parentRect.sizeDelta = new Vector2(requiredWidth, parentRect.sizeDelta.y);
-                Debug.Log($"TurnOrderUI: Adjusted panel width to {requiredWidth}px");
-            }
-
-            for (int i = 0; i < units.Count; i++)
-            {
-                Debug.Log($"TurnOrderUI: Creating portrait {i} for {units[i].UnitName}");
-                CreatePortrait(units[i], i, scaledPortraitSize);
-            }
-
-            Debug.Log($"TurnOrderUI: Created {portraits.Count} total portraits");
         }
 
-        private void CreatePortrait(Unit unit, int index, float portraitSize)
+        private int CalculateMaxVisiblePortraits()
+        {
+            RectTransform rectTransform = GetComponent<RectTransform>();
+            float availableWidth = rectTransform.rect.width - leftPadding - rightPadding;
+
+            int maxPortraits = Mathf.FloorToInt((availableWidth + portraitSpacing) / (portraitSize + portraitSpacing));
+
+            return Mathf.Max(1, maxPortraits);
+        }
+
+        /// <summary>
+        /// Build the display queue: full turn order, MINUS units who have finished, wrapping to next round.
+        /// </summary>
+        private void UpdateTurnOrderLayout(bool immediate)
+        {
+            if (turnManager == null) return;
+
+            List<Unit> fullTurnOrder = turnManager.GetTurnOrder();
+            HashSet<Unit> finishedUnits = GetFinishedUnits();
+            int maxVisible = CalculateMaxVisiblePortraits();
+
+            Debug.Log($"=== UPDATE LAYOUT === Finished: {finishedUnits.Count}, Max Visible: {maxVisible}");
+
+            // Build display queue from full turn order, skipping finished units, wrapping around
+            List<TurnOrderPortrait> visiblePortraits = new List<TurnOrderPortrait>();
+            int displayCount = 0;
+
+            // Start from beginning of turn order and loop until we have enough portraits
+            for (int roundOffset = 0; roundOffset < 2 && displayCount < maxVisible; roundOffset++)
+            {
+                for (int i = 0; i < fullTurnOrder.Count && displayCount < maxVisible; i++)
+                {
+                    Unit unit = fullTurnOrder[i];
+
+                    // Skip finished units (only in first round)
+                    if (roundOffset == 0 && finishedUnits.Contains(unit))
+                    {
+                        continue;
+                    }
+
+                    // Skip dead units
+                    if (!unit.IsAlive)
+                    {
+                        continue;
+                    }
+
+                    TurnOrderPortrait portrait = portraits.Find(p => p.unit == unit);
+                    if (portrait != null)
+                    {
+                        visiblePortraits.Add(portrait);
+                        string roundLabel = roundOffset == 0 ? "This Round" : "Next Round";
+                        Debug.Log($"  Position {displayCount}: {unit.UnitName} ({roundLabel})");
+                        displayCount++;
+                    }
+                }
+            }
+
+            // Position portraits
+            if (immediate)
+            {
+                PositionPortraitsImmediate(visiblePortraits);
+            }
+            else
+            {
+                StartCoroutine(AnimateLayoutChange(visiblePortraits));
+            }
+
+            // Hide non-visible portraits
+            foreach (TurnOrderPortrait portrait in portraits)
+            {
+                if (!visiblePortraits.Contains(portrait))
+                {
+                    portrait.portraitObject.SetActive(false);
+                }
+            }
+        }
+
+        private void PositionPortraitsImmediate(List<TurnOrderPortrait> visiblePortraits)
+        {
+            if (visiblePortraits.Count == 0) return;
+
+            // Calculate total width of all portraits
+            float totalWidth = (visiblePortraits.Count * portraitSize) + ((visiblePortraits.Count - 1) * portraitSpacing);
+            
+            // Since the RectTransform pivot is at center (0.5), anchoredPosition.x is relative to center
+            // To center the group: start from -totalWidth/2, then add half portrait size to center first portrait
+            float startX = -totalWidth / 2f + portraitSize / 2f;
+            
+            for (int i = 0; i < visiblePortraits.Count; i++)
+            {
+                TurnOrderPortrait portrait = visiblePortraits[i];
+                portrait.portraitObject.SetActive(true);
+
+                float xPos = startX + (i * (portraitSize + portraitSpacing));
+                float yPos = -topPadding;
+
+                RectTransform rect = portrait.portraitObject.GetComponent<RectTransform>();
+                rect.anchoredPosition = new Vector2(xPos, yPos);
+            }
+        }
+
+        private IEnumerator AnimateLayoutChange(List<TurnOrderPortrait> visiblePortraits)
+        {
+            isAnimating = true;
+
+            Dictionary<TurnOrderPortrait, Vector2> targetPositions = new Dictionary<TurnOrderPortrait, Vector2>();
+            Dictionary<TurnOrderPortrait, Vector2> startPositions = new Dictionary<TurnOrderPortrait, Vector2>();
+
+            // Calculate total width of all portraits
+            float totalWidth = (visiblePortraits.Count * portraitSize) + ((visiblePortraits.Count - 1) * portraitSpacing);
+            
+            // Since the RectTransform pivot is at center (0.5), anchoredPosition.x is relative to center
+            // To center the group: start from -totalWidth/2, then add half portrait size to center first portrait
+            float startX = -totalWidth / 2f + portraitSize / 2f;
+            
+            for (int i = 0; i < visiblePortraits.Count; i++)
+            {
+                TurnOrderPortrait portrait = visiblePortraits[i];
+                portrait.portraitObject.SetActive(true);
+
+                RectTransform rect = portrait.portraitObject.GetComponent<RectTransform>();
+                startPositions[portrait] = rect.anchoredPosition;
+
+                float targetX = startX + (i * (portraitSize + portraitSpacing));
+                float targetY = -topPadding;
+                targetPositions[portrait] = new Vector2(targetX, targetY);
+            }
+
+            float elapsed = 0f;
+
+            while (elapsed < animationDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / animationDuration);
+                t = t * t * (3f - 2f * t);
+
+                foreach (TurnOrderPortrait portrait in visiblePortraits)
+                {
+                    if (portrait.portraitObject.activeSelf)
+                    {
+                        RectTransform rect = portrait.portraitObject.GetComponent<RectTransform>();
+                        rect.anchoredPosition = Vector2.Lerp(startPositions[portrait], targetPositions[portrait], t);
+                    }
+                }
+
+                yield return null;
+            }
+
+            // Snap to final
+            foreach (TurnOrderPortrait portrait in visiblePortraits)
+            {
+                if (portrait.portraitObject.activeSelf)
+                {
+                    RectTransform rect = portrait.portraitObject.GetComponent<RectTransform>();
+                    rect.anchoredPosition = targetPositions[portrait];
+                }
+            }
+
+            isAnimating = false;
+            Debug.Log("Animation complete!");
+        }
+
+        private void CreatePortrait(Unit unit)
         {
             TurnOrderPortrait portrait = new TurnOrderPortrait();
             portrait.unit = unit;
 
-            // Create container
             GameObject container = new GameObject($"Portrait_{unit.UnitName}");
             container.transform.SetParent(transform, false);
+            container.SetActive(false);
 
             RectTransform containerRect = container.AddComponent<RectTransform>();
-            containerRect.sizeDelta = new Vector2(portraitSize, portraitSize + 30);
-            
-            // Horizontal layout - all in one row
-            float xPos = index * (portraitSize + portraitSpacing);
-            float yPos = 0;
-            
-            containerRect.anchoredPosition = new Vector2(xPos, yPos);
+            float containerHeight = portraitSize + 30;
+            containerRect.sizeDelta = new Vector2(portraitSize, containerHeight);
 
             portrait.portraitObject = container;
 
-            // Create highlight border (background)
+            // Highlight border
             GameObject borderObj = new GameObject("HighlightBorder");
             borderObj.transform.SetParent(container.transform, false);
             portrait.highlightBorder = borderObj.AddComponent<Image>();
-            portrait.highlightBorder.color = new Color(1f, 1f, 0f, 0f); // Transparent yellow
+            portrait.highlightBorder.color = new Color(1f, 1f, 0f, 0f);
 
             RectTransform borderRect = borderObj.GetComponent<RectTransform>();
             borderRect.anchorMin = new Vector2(0.5f, 1f);
@@ -142,20 +328,15 @@ namespace Riftbourne.UI
             borderRect.anchoredPosition = Vector2.zero;
             borderRect.sizeDelta = new Vector2(portraitSize + 8, portraitSize + 8);
 
-            // Create portrait image
+            // Portrait image
             GameObject imageObj = new GameObject("Portrait");
             imageObj.transform.SetParent(container.transform, false);
             portrait.portraitImage = imageObj.AddComponent<Image>();
 
-            // Assign placeholder sprite
             if (unit.IsPlayerControlled)
-            {
                 portrait.portraitImage.sprite = PortraitGenerator.GetPlayerPortrait();
-            }
             else
-            {
                 portrait.portraitImage.sprite = PortraitGenerator.GetEnemyPortrait();
-            }
 
             RectTransform imageRect = imageObj.GetComponent<RectTransform>();
             imageRect.anchorMin = new Vector2(0.5f, 1f);
@@ -164,7 +345,7 @@ namespace Riftbourne.UI
             imageRect.anchoredPosition = Vector2.zero;
             imageRect.sizeDelta = new Vector2(portraitSize, portraitSize);
 
-            // Create name label
+            // Name
             GameObject nameObj = new GameObject("Name");
             nameObj.transform.SetParent(container.transform, false);
             portrait.nameText = nameObj.AddComponent<Text>();
@@ -178,23 +359,22 @@ namespace Riftbourne.UI
             nameRect.anchorMin = new Vector2(0.5f, 1f);
             nameRect.anchorMax = new Vector2(0.5f, 1f);
             nameRect.pivot = new Vector2(0.5f, 1f);
-            nameRect.anchoredPosition = new Vector2(0, -portraitSize - 5);
-            nameRect.sizeDelta = new Vector2(portraitSize, 20);
+            nameRect.anchoredPosition = new Vector2(0, -portraitSize - 2);
+            nameRect.sizeDelta = new Vector2(portraitSize, 15);
 
-            // Create HP bar background
+            // HP bar
             GameObject hpBgObj = new GameObject("HPBarBackground");
             hpBgObj.transform.SetParent(container.transform, false);
             portrait.hpBarBackground = hpBgObj.AddComponent<Image>();
-            portrait.hpBarBackground.color = new Color(0.2f, 0.2f, 0.2f, 0.8f); // Dark gray
+            portrait.hpBarBackground.color = new Color(0.2f, 0.2f, 0.2f, 0.8f);
 
             RectTransform hpBgRect = hpBgObj.GetComponent<RectTransform>();
             hpBgRect.anchorMin = new Vector2(0.5f, 1f);
             hpBgRect.anchorMax = new Vector2(0.5f, 1f);
             hpBgRect.pivot = new Vector2(0.5f, 1f);
-            hpBgRect.anchoredPosition = new Vector2(0, -portraitSize - 25);
-            hpBgRect.sizeDelta = new Vector2(portraitSize - 10, 6);
+            hpBgRect.anchoredPosition = new Vector2(0, -portraitSize - 20);
+            hpBgRect.sizeDelta = new Vector2(portraitSize - 10, 5);
 
-            // Create HP bar fill
             GameObject hpFillObj = new GameObject("HPBarFill");
             hpFillObj.transform.SetParent(hpBgObj.transform, false);
             portrait.hpBarFill = hpFillObj.AddComponent<Image>();
@@ -205,14 +385,13 @@ namespace Riftbourne.UI
             hpFillRect.anchorMax = new Vector2(1f, 0.5f);
             hpFillRect.pivot = new Vector2(0f, 0.5f);
             hpFillRect.anchoredPosition = Vector2.zero;
-            hpFillRect.sizeDelta = new Vector2(0, 6);
+            hpFillRect.sizeDelta = new Vector2(0, 5);
 
-            // Make portrait clickable
+            // Clickable
             Button portraitButton = container.AddComponent<Button>();
             portraitButton.onClick.AddListener(() => OnPortraitClicked(unit));
-
-            // Add visual feedback
             portraitButton.targetGraphic = portrait.portraitImage;
+
             ColorBlock colors = portraitButton.colors;
             colors.normalColor = Color.white;
             colors.highlightedColor = new Color(1.2f, 1.2f, 1.2f);
@@ -220,8 +399,6 @@ namespace Riftbourne.UI
             portraitButton.colors = colors;
 
             portraits.Add(portrait);
-
-            Debug.Log($"TurnOrderUI: Portrait created for {unit.UnitName}, container position: {containerRect.anchoredPosition}");
         }
 
         private void OnPortraitClicked(Unit unit)
@@ -229,7 +406,6 @@ namespace Riftbourne.UI
             if (unit != null && unit.IsPlayerControlled)
             {
                 PartyManager.Instance?.SelectUnit(unit);
-                Debug.Log($"Portrait clicked: Selected {unit.UnitName}");
             }
         }
 
@@ -239,38 +415,40 @@ namespace Riftbourne.UI
 
             Unit currentUnit = turnManager.CurrentUnit;
             Unit selectedUnit = PartyManager.Instance?.SelectedUnit;
+            List<Unit> currentWindow = turnManager.GetCurrentTurnWindow();
 
             foreach (var portrait in portraits)
             {
+                if (!portrait.portraitObject.activeSelf) continue;
+
                 bool isCurrent = (portrait.unit == currentUnit);
                 bool isSelected = (portrait.unit == selectedUnit);
+                bool isInCurrentWindow = currentWindow.Contains(portrait.unit);
 
-                // Yellow border for current turn, white for selected
                 if (isSelected)
                 {
-                    portrait.highlightBorder.color = new Color(1f, 1f, 1f, 1f); // White for selected
+                    portrait.highlightBorder.color = new Color(1f, 1f, 1f, 1f);
+                }
+                else if (isInCurrentWindow)
+                {
+                    portrait.highlightBorder.color = new Color(0f, 1f, 1f, 0.5f);
                 }
                 else if (isCurrent)
                 {
-                    portrait.highlightBorder.color = new Color(1f, 1f, 0f, 0.5f); // Faint yellow for current turn
+                    portrait.highlightBorder.color = new Color(1f, 1f, 0f, 0.5f);
                 }
                 else
                 {
-                    portrait.highlightBorder.color = new Color(1f, 1f, 1f, 0.2f); // Very faint white
+                    portrait.highlightBorder.color = new Color(1f, 1f, 1f, 0.2f);
                 }
 
-                // Make portrait brighter for selected unit
-                portrait.portraitImage.color = isSelected ?
-                    Color.white :
-                    new Color(0.7f, 0.7f, 0.7f, 1f);
+                portrait.portraitImage.color = isSelected ? Color.white : new Color(0.7f, 0.7f, 0.7f, 1f);
 
-                // Update HP bar
                 if (portrait.unit != null && portrait.hpBarFill != null)
                 {
                     float hpPercent = (float)portrait.unit.CurrentHP / portrait.unit.MaxHP;
                     portrait.hpBarFill.fillAmount = hpPercent;
 
-                    // Color based on HP percentage
                     if (hpPercent > 0.6f)
                         portrait.hpBarFill.color = Color.green;
                     else if (hpPercent > 0.3f)

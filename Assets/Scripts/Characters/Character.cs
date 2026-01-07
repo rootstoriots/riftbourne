@@ -37,6 +37,17 @@ namespace Riftbourne.Characters
         private List<GridCell> currentPath; // Path to follow
         private int currentPathIndex; // Which cell in path we're moving to
 
+        // Cached manager references (protected so derived classes can access)
+        protected GridManager gridManager;
+        protected HazardManager hazardManager;
+
+        private void Awake()
+        {
+            // Cache manager references
+            gridManager = FindFirstObjectByType<GridManager>();
+            hazardManager = FindFirstObjectByType<HazardManager>();
+        }
+
         private void Update()
         {
             if (IsMoving)
@@ -115,9 +126,7 @@ namespace Riftbourne.Characters
                 Unit unit = GetComponent<Unit>();
                 if (unit != null)
                 {
-                    HazardManager hazardManager = FindFirstObjectByType<HazardManager>();
-                    GridManager gridManager = FindFirstObjectByType<GridManager>();
-
+                    // Use cached manager references with null checks
                     if (hazardManager != null && gridManager != null &&
                         gridManager.IsValidGridPosition(currentGridX, currentGridY))
                     {
@@ -185,7 +194,7 @@ namespace Riftbourne.Characters
         /// </summary>
         private void UpdateGridOccupancy(int newX, int newY)
         {
-            GridManager gridManager = FindFirstObjectByType<GridManager>();
+            // Use cached gridManager reference
             if (gridManager == null) return;
 
             // Clear old position

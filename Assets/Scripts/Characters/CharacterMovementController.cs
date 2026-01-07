@@ -19,6 +19,9 @@ namespace Riftbourne.Characters
         private Skill selectedSkill = null;
         private bool awaitingSkillTarget = false;
 
+        // Cached camera reference
+        private Camera mainCamera;
+
         private void Awake()
         {
             unit = GetComponent<Unit>();
@@ -35,6 +38,9 @@ namespace Riftbourne.Characters
             {
                 turnManager = FindFirstObjectByType<TurnManager>();
             }
+
+            // Cache camera reference
+            mainCamera = Camera.main;
         }
 
         private void Update()
@@ -104,7 +110,18 @@ namespace Riftbourne.Characters
 
         private void HandleLeftClick()
         {
-            Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
+            // Use cached camera reference with null check
+            if (mainCamera == null)
+            {
+                mainCamera = Camera.main;
+                if (mainCamera == null)
+                {
+                    Debug.LogWarning("No main camera found!");
+                    return;
+                }
+            }
+
+            Ray ray = mainCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
             RaycastHit hit;
 
             if (!Physics.Raycast(ray, out hit))
@@ -136,7 +153,8 @@ namespace Riftbourne.Characters
             }
 
             // CASE 2: Clicked on enemy unit - attack (melee or ranged)
-            if (targetUnit != null && targetUnit != unit)
+            // Only attack if target is an enemy (not player-controlled) and not self
+            if (targetUnit != null && targetUnit != unit && !targetUnit.IsPlayerControlled)
             {
                 if (unit.HasActedThisTurn)
                 {
@@ -144,10 +162,14 @@ namespace Riftbourne.Characters
                     return;
                 }
 
-                if (AttackAction.ExecuteMeleeAttack(unit, targetUnit))
+                // Attempt attack - if not adjacent, show message but don't move
+                if (!AttackAction.ExecuteMeleeAttack(unit, targetUnit))
                 {
-                    unit.MarkAsActed();
+                    // Attack failed (likely not adjacent) - don't allow movement to enemy's position
+                    Debug.Log($"Cannot attack {targetUnit.UnitName} - must be adjacent!");
+                    return;
                 }
+                // Attack succeeded - MarkAsActed is already called by AttackAction
                 return;
             }
 
@@ -180,7 +202,6 @@ namespace Riftbourne.Characters
             if (unit.CanMoveTo(targetX, targetY))
             {
                 Vector3 targetWorldPos = targetCell.WorldPosition;
-                int movementCost = distance;
 
                 // Clear range visualizer when starting movement
                 if (gridManager != null)
@@ -191,10 +212,28 @@ namespace Riftbourne.Characters
                 // Get the actual path to follow
                 List<GridCell> path = gridManager.GetPath(unit, targetX, targetY);
                 
+                // If pathfinding failed, don't allow movement
+                if (path == null || path.Count == 0)
+                {
+                    Debug.LogWarning($"Pathfinding failed for movement to ({targetX}, {targetY})");
+                    return;
+                }
+                
+                // Calculate movement cost based on actual path length (not Manhattan distance)
+                // Path length is number of cells in path minus 1 (start cell doesn't count)
+                int movementCost = path.Count - 1;
+                
+                // Verify we have enough movement points for the actual path
+                if (movementCost > unit.MovementPointsRemaining)
+                {
+                    Debug.Log($"Not enough movement for path! Need {movementCost}, have {unit.MovementPointsRemaining}");
+                    return;
+                }
+                
                 // Start moving - points will be spent when movement completes
                 unit.MoveTo(targetX, targetY, targetWorldPos, () => 
                 {
-                    // Movement complete callback
+                    // Movement complete callback - spend points based on actual path length
                     unit.SpendMovementPoints(movementCost);
                     
                     // Re-show movement range at new position with remaining points

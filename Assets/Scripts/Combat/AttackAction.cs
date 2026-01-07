@@ -52,17 +52,23 @@ namespace Riftbourne.Combat
                 attacker.AwardXP(25);  // Kill bonus
             }
 
+            // Mark attacker as acted (caller can still decide when to end turn)
+            attacker.MarkAsActed();
+
             return true;
         }
 
         /// <summary>
-        /// Check if two units are adjacent on the grid (Manhattan distance = 1).
+        /// Check if two units are adjacent on the grid (Chebyshev distance = 1).
+        /// Allows attacks in all 8 directions (cardinal + diagonal).
         /// </summary>
         private static bool AreUnitsAdjacent(Unit unit1, Unit unit2)
         {
-            int distance = Mathf.Abs(unit1.GridX - unit2.GridX) +
-                        Mathf.Abs(unit1.GridY - unit2.GridY);
-            Debug.Log($"Adjacency check: {unit1.UnitName} at ({unit1.GridX},{unit1.GridY}) vs {unit2.UnitName} at ({unit2.GridX},{unit2.GridY}) = distance {distance}");
+            int dx = Mathf.Abs(unit1.GridX - unit2.GridX);
+            int dy = Mathf.Abs(unit1.GridY - unit2.GridY);
+            // Chebyshev distance: max of dx and dy (allows diagonal adjacency)
+            int distance = Mathf.Max(dx, dy);
+            Debug.Log($"Adjacency check: {unit1.UnitName} at ({unit1.GridX},{unit1.GridY}) vs {unit2.UnitName} at ({unit2.GridX},{unit2.GridY}) = Chebyshev distance {distance}");
             return distance == 1;
         }
     }

@@ -32,6 +32,9 @@ namespace Riftbourne.Grid
         // Input
         private PlayerInputActions inputActions;
 
+        // Cached camera reference
+        private Camera mainCamera;
+
         public static GridManager Instance { get; private set; }
 
         public int GridWidth => gridWidth;
@@ -56,6 +59,9 @@ namespace Riftbourne.Grid
             pathfinding = new Pathfinding(this);
             CreateGridVisuals();
             CreateSelectionHighlight();
+
+            // Cache camera reference
+            mainCamera = Camera.main;
         }
 
         private void OnEnable()
@@ -170,7 +176,18 @@ namespace Riftbourne.Grid
             // Check if mouse button was pressed this frame
             if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
             {
-                Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
+                // Use cached camera reference with null check
+                if (mainCamera == null)
+                {
+                    mainCamera = Camera.main;
+                    if (mainCamera == null)
+                    {
+                        Debug.LogWarning("No main camera found!");
+                        return;
+                    }
+                }
+
+                Ray ray = mainCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
                 RaycastHit hit;
 
                 if (Physics.Raycast(ray, out hit))
@@ -280,6 +297,7 @@ namespace Riftbourne.Grid
 
         /// <summary>
         /// Get all cells within attack range of a position.
+        /// Uses Chebyshev distance to allow diagonal attacks (8 directions).
         /// </summary>
         public List<GridCell> GetCellsInAttackRange(int startX, int startY, int range)
         {
@@ -289,8 +307,10 @@ namespace Riftbourne.Grid
             {
                 for (int y = 0; y < gridHeight; y++)
                 {
-                    // Calculate Manhattan distance
-                    int distance = Mathf.Abs(x - startX) + Mathf.Abs(y - startY);
+                    // Calculate Chebyshev distance (max of dx and dy) to allow diagonal attacks
+                    int dx = Mathf.Abs(x - startX);
+                    int dy = Mathf.Abs(y - startY);
+                    int distance = Mathf.Max(dx, dy);
 
                     if (distance <= range && distance > 0) // Don't include current cell
                     {
