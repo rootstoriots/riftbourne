@@ -16,11 +16,14 @@ namespace Riftbourne.Core
         {
             get
             {
-                if (mainCamera == null)
+                // Always return the current active camera to ensure we get the live camera
+                // even if it moves or rotates during gameplay
+                Camera currentCamera = Camera.main;
+                if (currentCamera != null)
                 {
-                    mainCamera = Camera.main;
+                    mainCamera = currentCamera; // Update cache for null checking
                 }
-                return mainCamera;
+                return currentCamera;
             }
         }
 

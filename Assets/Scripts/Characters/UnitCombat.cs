@@ -58,10 +58,16 @@ namespace Riftbourne.Characters
             return damage;
         }
 
-        public void Heal(int amount, int maxHP)
+        /// <summary>
+        /// Heal this unit by a specified amount.
+        /// Returns the actual amount healed (may be less than requested if at max HP).
+        /// </summary>
+        public int Heal(int amount, int maxHP)
         {
+            int hpBefore = currentHP;
             currentHP += amount;
             currentHP = Mathf.Min(currentHP, maxHP);
+            return currentHP - hpBefore; // Return actual amount healed
         }
 
         public void SetHP(int value, int maxHP)

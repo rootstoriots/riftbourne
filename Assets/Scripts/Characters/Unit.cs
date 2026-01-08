@@ -504,6 +504,12 @@ namespace Riftbourne.Characters
             OnHPChanged?.Invoke(currentHP, MaxHP);
             GameEvents.RaiseUnitHPChanged(this, currentHP, MaxHP);
 
+            // Raise damage event for damage indicators
+            if (damage > 0)
+            {
+                GameEvents.RaiseUnitDamaged(this, damage);
+            }
+
             if (!IsAlive)
             {
                 OnDeath();
@@ -530,6 +536,12 @@ namespace Riftbourne.Characters
             OnHPChanged?.Invoke(currentHP, MaxHP);
             GameEvents.RaiseUnitHPChanged(this, currentHP, MaxHP);
 
+            // Raise damage event for damage indicators
+            if (damage > 0)
+            {
+                GameEvents.RaiseUnitDamaged(this, damage);
+            }
+
             if (!IsAlive)
             {
                 OnDeath();
@@ -540,17 +552,26 @@ namespace Riftbourne.Characters
 
         /// <summary>
         /// Heal this unit by a specified amount.
+        /// Returns the actual amount healed (may be less than requested if at max HP).
         /// </summary>
-        public void Heal(int amount)
+        public int Heal(int amount)
         {
-            unitCombat.Heal(amount, MaxHP);
+            int actualHealing = unitCombat.Heal(amount, MaxHP);
             currentHP = unitCombat.CurrentHP;
 
-            Debug.Log($"{unitName} healed for {amount}! HP: {currentHP}/{MaxHP}");
+            Debug.Log($"{unitName} healed for {actualHealing}! HP: {currentHP}/{MaxHP}");
 
             // Raise HP changed events (both local and global)
             OnHPChanged?.Invoke(currentHP, MaxHP);
             GameEvents.RaiseUnitHPChanged(this, currentHP, MaxHP);
+
+            // Raise healing event for damage indicators
+            if (actualHealing > 0)
+            {
+                GameEvents.RaiseUnitHealed(this, actualHealing);
+            }
+
+            return actualHealing;
         }
 
         /// <summary>

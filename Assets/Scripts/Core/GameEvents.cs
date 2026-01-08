@@ -36,6 +36,18 @@ namespace Riftbourne.Core
         /// </summary>
         public static event Action<Unit, Skill> OnSkillMastered;
 
+        /// <summary>
+        /// Event raised when a unit takes damage.
+        /// Parameters: (unit, damageAmount)
+        /// </summary>
+        public static event Action<Unit, int> OnUnitDamaged;
+
+        /// <summary>
+        /// Event raised when a unit receives healing.
+        /// Parameters: (unit, healAmount)
+        /// </summary>
+        public static event Action<Unit, int> OnUnitHealed;
+
         // Combat Events
         /// <summary>
         /// Event raised when the turn window changes (units that can act).
@@ -100,6 +112,26 @@ namespace Riftbourne.Core
         public static void RaiseCombatEnded(bool playerVictory)
         {
             OnCombatEnded?.Invoke(playerVictory);
+        }
+
+        public static void RaiseUnitDamaged(Unit unit, int damageAmount)
+        {
+            // Ensure DamageIndicatorManager is initialized
+            if (OnUnitDamaged == null || OnUnitDamaged.GetInvocationList().Length == 0)
+            {
+                _ = Riftbourne.UI.DamageIndicatorManager.Instance;
+            }
+            OnUnitDamaged?.Invoke(unit, damageAmount);
+        }
+
+        public static void RaiseUnitHealed(Unit unit, int healAmount)
+        {
+            // Ensure DamageIndicatorManager is initialized
+            if (OnUnitHealed == null || OnUnitHealed.GetInvocationList().Length == 0)
+            {
+                _ = Riftbourne.UI.DamageIndicatorManager.Instance;
+            }
+            OnUnitHealed?.Invoke(unit, healAmount);
         }
     }
 }

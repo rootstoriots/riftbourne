@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &402787091324160107
+--- !u!1 &4640911952211872031
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,49 +8,51 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 5808024134342609170}
-  - component: {fileID: 4333130605535192748}
-  - component: {fileID: 7867312870576611441}
-  - component: {fileID: 6189617795732575617}
-  - component: {fileID: 5032910207788555657}
-  - component: {fileID: -4084713091064031601}
+  - component: {fileID: 5358276459751495775}
+  - component: {fileID: 102722998435917766}
+  - component: {fileID: 8186423475748518667}
+  - component: {fileID: 8282857802231507406}
+  - component: {fileID: 8232407871910751992}
+  - component: {fileID: 4985595894036348668}
+  - component: {fileID: 613123165966370499}
+  - component: {fileID: 1775289188473511082}
   m_Layer: 0
-  m_Name: EnemyUnit
+  m_Name: HostileWildlifeUnit
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &5808024134342609170
+--- !u!4 &5358276459751495775
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 402787091324160107}
+  m_GameObject: {fileID: 4640911952211872031}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 3, y: 0.5, z: 0}
+  m_LocalPosition: {x: 8, y: 0.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &4333130605535192748
+--- !u!33 &102722998435917766
 MeshFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 402787091324160107}
+  m_GameObject: {fileID: 4640911952211872031}
   m_Mesh: {fileID: 10208, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &7867312870576611441
+--- !u!23 &8186423475748518667
 MeshRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 402787091324160107}
+  m_GameObject: {fileID: 4640911952211872031}
   m_Enabled: 1
   m_CastShadows: 1
   m_ReceiveShadows: 1
@@ -69,7 +71,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 9067df9194f1ec54d975f3eb6aae4fda, type: 2}
+  - {fileID: 2100000, guid: 1794061fbfe5b7f418f63a8844aa13ac, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -93,13 +95,13 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!136 &6189617795732575617
+--- !u!136 &8282857802231507406
 CapsuleCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 402787091324160107}
+  m_GameObject: {fileID: 4640911952211872031}
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -116,19 +118,19 @@ CapsuleCollider:
   m_Height: 2
   m_Direction: 1
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &5032910207788555657
+--- !u!114 &8232407871910751992
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 402787091324160107}
+  m_GameObject: {fileID: 4640911952211872031}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cfac7a5412679864d92ece6b2aac95c8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Characters.Unit
-  characterName: Warrior
+  characterName: Shadow Wolf
   gridX: 0
   gridY: 0
   movementRange: 5
@@ -139,7 +141,7 @@ MonoBehaviour:
   strength: 5
   finesse: 5
   focus: 5
-  speed: 5
+  speed: 9
   luck: 5
   hpDisplay: {fileID: 0}
   mantle: 0
@@ -150,22 +152,22 @@ MonoBehaviour:
   accessory1: {fileID: 0}
   accessory2: {fileID: 0}
   codex: {fileID: 0}
-  unitName: Enemy
+  unitName: Shadow Wolf
   isPlayerControlled: 0
   factionData: {fileID: 11400000, guid: cfce2e28519af6140b312e9ee6d3b9de, type: 2}
   faction: 0
-  unitType: 1
+  unitType: 0
   level: 1
   currentXP: 0
   skillPoints: 0
   totalActions: 0
---- !u!114 &-4084713091064031601
+--- !u!114 &4985595894036348668
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 402787091324160107}
+  m_GameObject: {fileID: 4640911952211872031}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 1daadfa1161011d4ab0b59b423760573, type: 3}
@@ -174,3 +176,29 @@ MonoBehaviour:
   unit: {fileID: 0}
   gridManager: {fileID: 0}
   turnManager: {fileID: 0}
+--- !u!114 &613123165966370499
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4640911952211872031}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f4fb57a40f91584f89ca38b88c6b820, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Combat.AIController
+  thinkingDelay: 0.5
+  behaviorData: {fileID: 11400000, guid: 71f5cf370bd59e14c803ce49fe1abe46, type: 2}
+--- !u!114 &1775289188473511082
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4640911952211872031}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 03a6fb53ac13e6742858ac9cc7091b87, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Characters.UnitClickHandler
