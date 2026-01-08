@@ -24,7 +24,6 @@ namespace Riftbourne.UI
         [SerializeField] private float leftPadding = 183.33f;
         [SerializeField] private float rightPadding = 128.33f;
         [SerializeField] private float topPadding = 15f;
-        [SerializeField] private float bottomPadding = 15f;
 
         [Header("Animation")]
         [SerializeField] private float animationDuration = 0.3f;
@@ -32,6 +31,32 @@ namespace Riftbourne.UI
         private List<TurnOrderPortrait> portraits = new List<TurnOrderPortrait>();
         private HashSet<Unit> lastKnownFinishedUnits = new HashSet<Unit>();
         private bool isAnimating = false;
+
+        private void Awake()
+        {
+            if (turnManager == null)
+            {
+                turnManager = ManagerRegistry.Get<TurnManager>();
+            }
+        }
+
+        private void OnEnable()
+        {
+            if (turnManager != null)
+            {
+                turnManager.OnTurnWindowChanged += OnTurnWindowChanged;
+                turnManager.OnUnitTurnEnded += OnUnitTurnEnded;
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (turnManager != null)
+            {
+                turnManager.OnTurnWindowChanged -= OnTurnWindowChanged;
+                turnManager.OnUnitTurnEnded -= OnUnitTurnEnded;
+            }
+        }
 
         private class TurnOrderPortrait
         {
@@ -46,11 +71,6 @@ namespace Riftbourne.UI
 
         private void Start()
         {
-            if (turnManager == null)
-            {
-                turnManager = FindFirstObjectByType<TurnManager>();
-            }
-
             if (turnManager == null)
             {
                 Debug.LogError("TurnOrderUI: Could not find TurnManager!");
@@ -70,7 +90,7 @@ namespace Riftbourne.UI
         private void Update()
         {
             UpdateHighlights();
-            CheckForFinishedUnitsChange();
+            // CheckForFinishedUnitsChange() is now event-driven, but we keep Update() for highlights
         }
 
         /// <summary>
@@ -107,22 +127,41 @@ namespace Riftbourne.UI
         }
 
         /// <summary>
-        /// Check if the set of finished units has changed.
+        /// Event handler for turn window changes. Updates the layout when units finish their turns.
         /// </summary>
-        private void CheckForFinishedUnitsChange()
+        private void OnTurnWindowChanged(List<Unit> currentWindow)
         {
-            if (turnManager == null || isAnimating) return;
+            if (isAnimating)
+            {
+                // If animating, queue the update for after animation completes
+                // But don't skip entirely - we need to update eventually
+                return;
+            }
 
             HashSet<Unit> currentFinished = GetFinishedUnits();
 
-            if (!currentFinished.SetEquals(lastKnownFinishedUnits))
+            // Always update if finished units changed, or if window is empty (new round starting)
+            bool shouldUpdate = !currentFinished.SetEquals(lastKnownFinishedUnits) || 
+                               (currentWindow.Count == 0 && lastKnownFinishedUnits.Count > 0);
+
+            if (shouldUpdate)
             {
                 Debug.Log($"Finished units changed from {lastKnownFinishedUnits.Count} to {currentFinished.Count}");
                 Debug.Log($"  Finished: [{string.Join(", ", currentFinished.Select(u => u.UnitName))}]");
+                Debug.Log($"  Current window: [{string.Join(", ", currentWindow.Select(u => u.UnitName))}]");
 
                 lastKnownFinishedUnits = new HashSet<Unit>(currentFinished);
                 UpdateTurnOrderLayout(immediate: false);
             }
+        }
+
+        /// <summary>
+        /// Event handler for when a unit ends their turn.
+        /// </summary>
+        private void OnUnitTurnEnded(Unit unit)
+        {
+            // Trigger layout update when a unit ends their turn
+            OnTurnWindowChanged(turnManager?.GetCurrentTurnWindow() ?? new List<Unit>());
         }
 
         private void CreateAllPortraits()

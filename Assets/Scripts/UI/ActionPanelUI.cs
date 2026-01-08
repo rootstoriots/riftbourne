@@ -36,14 +36,19 @@ namespace Riftbourne.UI
 
         private Unit currentUnit;
         private CharacterMovementController currentController;
+        private SkillTargetingController currentSkillController;
         private bool skillsMenuOpen = false;
 
-        private void Start()
+        private void Awake()
         {
             if (turnManager == null)
             {
-                turnManager = FindFirstObjectByType<TurnManager>();
+                turnManager = ManagerRegistry.Get<TurnManager>();
             }
+        }
+
+        private void Start()
+        {
 
             // Hide skills dropdown initially
             if (skillsDropdown != null)
@@ -94,6 +99,7 @@ namespace Riftbourne.UI
             {
                 currentUnit = newUnit;
                 currentController = currentUnit?.GetComponent<CharacterMovementController>();
+                currentSkillController = currentUnit?.GetComponent<SkillTargetingController>();
 
                 // Update unit stats display
                 if (currentUnitText != null && currentUnit != null)
@@ -284,7 +290,7 @@ namespace Riftbourne.UI
 
             // Add click listener
             Button button = buttonObj.GetComponent<Button>();
-            if (button != null && currentController != null)
+            if (button != null && currentSkillController != null)
             {
                 button.onClick.AddListener(() => OnSkillSelected(skill));
             }
@@ -292,10 +298,10 @@ namespace Riftbourne.UI
 
         private void OnSkillSelected(Skill skill)
         {
-            if (currentController != null)
+            if (currentSkillController != null)
             {
-                // Simulate number key press by calling controller's skill selection
-                currentController.SelectSkillFromUI(skill);
+                // Call skill targeting controller's skill selection
+                currentSkillController.SelectSkillFromUI(skill);
 
                 // Close dropdown
                 if (skillsDropdown != null)

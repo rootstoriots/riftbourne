@@ -14,11 +14,13 @@ namespace Riftbourne.Characters
     {
         private Unit unit;
         private CharacterMovementController movementController;
+        private SkillTargetingController skillTargetingController;
         private TurnManager turnManager;
 
         private void Awake()
         {
             unit = GetComponent<Unit>();
+            turnManager = ManagerRegistry.Get<TurnManager>();
             
             // Ensure this unit has a collider for raycasting
             Collider col = GetComponent<Collider>();
@@ -29,17 +31,12 @@ namespace Riftbourne.Characters
             }
         }
 
-        private void Start()
-        {
-            turnManager = FindFirstObjectByType<TurnManager>();
-        }
-
         private void OnMouseDown()
         {
             if (unit == null) return;
 
-            // If this is a player unit, select it for control
-            if (unit.IsPlayerControlled)
+            // If this is a player faction unit, select it for control
+            if (unit.Faction == Faction.Player)
             {
                 HandlePlayerUnitClick();
             }
@@ -85,19 +82,21 @@ namespace Riftbourne.Characters
                 return;
             }
 
-            // Get the movement controller for the selected unit
+            // Get the movement controller and skill targeting controller for the selected unit
             movementController = selectedUnit.GetComponent<CharacterMovementController>();
+            skillTargetingController = selectedUnit.GetComponent<SkillTargetingController>();
+            
             if (movementController == null)
             {
                 Debug.LogWarning($"{selectedUnit.UnitName} has no CharacterMovementController!");
                 return;
             }
 
-            // Check if a skill is selected
-            if (movementController.IsSkillSelected)
+            // Check if a skill is selected (via SkillTargetingController)
+            if (skillTargetingController != null && skillTargetingController.AwaitingSkillTarget)
             {
                 // Use skill on this enemy
-                movementController.UseSkillOnTarget(unit);
+                skillTargetingController.UseSkillOnTarget(unit);
                 Debug.Log($"Using skill on {unit.UnitName}");
             }
             else

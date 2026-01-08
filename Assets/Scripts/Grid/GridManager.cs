@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Riftbourne.Grid;
+using Riftbourne.Core;
 using System.Collections.Generic;
 
 namespace Riftbourne.Grid
@@ -32,8 +33,8 @@ namespace Riftbourne.Grid
         // Input
         private PlayerInputActions inputActions;
 
-        // Cached camera reference
-        private Camera mainCamera;
+        // Camera service reference
+        private CameraService cameraService;
 
         public static GridManager Instance { get; private set; }
 
@@ -53,6 +54,9 @@ namespace Riftbourne.Grid
                 return;
             }
 
+            // Register with ManagerRegistry for dependency injection
+            ManagerRegistry.Register(this);
+
             inputActions = new PlayerInputActions();
 
             GenerateGrid();
@@ -60,8 +64,8 @@ namespace Riftbourne.Grid
             CreateGridVisuals();
             CreateSelectionHighlight();
 
-            // Cache camera reference
-            mainCamera = Camera.main;
+            // Get camera service
+            cameraService = CameraService.Instance;
         }
 
         private void OnEnable()
@@ -72,6 +76,11 @@ namespace Riftbourne.Grid
         private void OnDisable()
         {
             inputActions?.Gameplay.Disable();
+        }
+
+        private void OnDestroy()
+        {
+            ManagerRegistry.Unregister(this);
         }
 
         private void Update()
@@ -176,18 +185,24 @@ namespace Riftbourne.Grid
             // Check if mouse button was pressed this frame
             if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
             {
-                // Use cached camera reference with null check
-                if (mainCamera == null)
+                // Get camera - use CameraService if available, otherwise fallback to Camera.main
+                Camera cam = null;
+                if (cameraService != null && cameraService.MainCamera != null)
                 {
-                    mainCamera = Camera.main;
-                    if (mainCamera == null)
-                    {
-                        Debug.LogWarning("No main camera found!");
-                        return;
-                    }
+                    cam = cameraService.MainCamera;
+                }
+                else
+                {
+                    cam = Camera.main;
                 }
 
-                Ray ray = mainCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
+                if (cam == null)
+                {
+                    Debug.LogWarning("No main camera found!");
+                    return;
+                }
+
+                Ray ray = cam.ScreenPointToRay(Mouse.current.position.ReadValue());
                 RaycastHit hit;
 
                 if (Physics.Raycast(ray, out hit))
@@ -327,6 +342,38 @@ namespace Riftbourne.Grid
         }
 
         /// <summary>
+        /// Get all cells within skill range of a position.
+        /// Uses Manhattan distance (sum of dx and dy) to match Skill.IsInRange().
+        /// Shows all cells in range, not just occupied ones.
+        /// </summary>
+        public List<GridCell> GetCellsInSkillRange(int startX, int startY, int range)
+        {
+            List<GridCell> cellsInRange = new List<GridCell>();
+
+            for (int x = 0; x < gridWidth; x++)
+            {
+                for (int y = 0; y < gridHeight; y++)
+                {
+                    // Calculate Manhattan distance (sum of dx and dy) to match Skill.IsInRange()
+                    int dx = Mathf.Abs(x - startX);
+                    int dy = Mathf.Abs(y - startY);
+                    int distance = dx + dy;
+
+                    if (distance <= range && distance > 0) // Don't include current cell
+                    {
+                        GridCell cell = GetCell(x, y);
+                        if (cell != null)
+                        {
+                            cellsInRange.Add(cell);
+                        }
+                    }
+                }
+            }
+
+            return cellsInRange;
+        }
+
+        /// <summary>
         /// Show movement range visualization using proper pathfinding.
         /// </summary>
         public void ShowMovementRange(Characters.Unit unit, int range)
@@ -359,6 +406,17 @@ namespace Riftbourne.Grid
 
             List<GridCell> cells = GetCellsInAttackRange(startX, startY, range);
             rangeVisualizer.ShowAttackRange(cells);
+        }
+
+        /// <summary>
+        /// Show skill range visualization using Manhattan distance.
+        /// </summary>
+        public void ShowSkillRange(int startX, int startY, int range)
+        {
+            if (rangeVisualizer == null) return;
+
+            List<GridCell> cells = GetCellsInSkillRange(startX, startY, range);
+            rangeVisualizer.ShowAttackRange(cells); // Use attack range material for skills
         }
 
         /// <summary>

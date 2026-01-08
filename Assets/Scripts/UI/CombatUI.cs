@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using Riftbourne.Characters;
 using Riftbourne.Combat;
+using Riftbourne.Core;
 using System.Collections.Generic;
 
 namespace Riftbourne.UI
@@ -22,9 +23,37 @@ namespace Riftbourne.UI
         private Dictionary<Unit, UnitStatusUI> unitStatusDisplays = new Dictionary<Unit, UnitStatusUI>();
         private TurnManager turnManager;
 
+        private void Awake()
+        {
+            turnManager = ManagerRegistry.Get<TurnManager>();
+        }
+
+        private void OnEnable()
+        {
+            // Subscribe to GameEvents for decoupled event handling
+            GameEvents.OnCurrentUnitChanged += OnCurrentUnitChanged;
+            
+            // Also subscribe to TurnManager for backward compatibility
+            if (turnManager != null)
+            {
+                turnManager.OnCurrentUnitChanged += OnCurrentUnitChanged;
+            }
+        }
+
+        private void OnDisable()
+        {
+            // Unsubscribe from GameEvents
+            GameEvents.OnCurrentUnitChanged -= OnCurrentUnitChanged;
+            
+            // Unsubscribe from TurnManager
+            if (turnManager != null)
+            {
+                turnManager.OnCurrentUnitChanged -= OnCurrentUnitChanged;
+            }
+        }
+
         private void Start()
         {
-            turnManager = FindFirstObjectByType<TurnManager>();
             CreateUIPanels();
             FindAndRegisterUnits();
         }
@@ -32,6 +61,14 @@ namespace Riftbourne.UI
         private void Update()
         {
             UpdateAllUnitDisplays();
+            // HighlightCurrentUnit() is now event-driven
+        }
+
+        /// <summary>
+        /// Event handler for when the current unit changes.
+        /// </summary>
+        private void OnCurrentUnitChanged(Unit newUnit)
+        {
             HighlightCurrentUnit();
         }
 

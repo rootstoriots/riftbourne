@@ -18,9 +18,13 @@ namespace Riftbourne.Core
 
         [Header("Selection Visuals")]
         [SerializeField] private GameObject selectionRingPrefab;
+        [SerializeField] private ObjectPool selectionRingPool;
         private GameObject currentSelectionRing;
 
         public Unit SelectedUnit => selectedUnit;
+
+        private TurnManager turnManager;
+        private List<Unit> registeredPartyMembers = new List<Unit>();
 
         private void Awake()
         {
@@ -31,10 +35,21 @@ namespace Riftbourne.Core
             }
 
             Instance = this;
+            turnManager = ManagerRegistry.Get<TurnManager>();
         }
 
         private void Start()
         {
+            // Find and register any units that already exist (for units spawned before PartyManager)
+            Unit[] existingUnits = FindObjectsByType<Unit>(FindObjectsSortMode.None);
+            foreach (Unit unit in existingUnits)
+            {
+                if (unit.Faction == Faction.Player)
+                {
+                    RegisterUnit(unit);
+                }
+            }
+
             // Auto-select first party member at battle start
             SelectFirstPartyMember();
         }
@@ -46,14 +61,13 @@ namespace Riftbourne.Core
         /// </summary>
         public void SelectUnit(Unit unit)
         {
-            if (unit == null || !unit.IsPlayerControlled)
+            if (unit == null || unit.Faction != Faction.Player)
             {
                 Debug.LogWarning("Cannot select null or non-player unit");
                 return;
             }
 
             // Check if unit is in the current turn window
-            TurnManager turnManager = FindFirstObjectByType<TurnManager>();
             if (turnManager != null && !turnManager.IsUnitInCurrentWindow(unit))
             {
                 Debug.LogWarning($"Cannot select {unit.UnitName} - not in current turn window");
@@ -67,22 +81,53 @@ namespace Riftbourne.Core
         }
 
         /// <summary>
-        /// Get all player-controlled units in the scene.
+        /// Register a player-controlled unit with the party manager.
+        /// </summary>
+        public void RegisterUnit(Unit unit)
+        {
+            if (unit == null || unit.Faction != Faction.Player)
+            {
+                Debug.LogWarning("PartyManager: Cannot register null or non-player unit!");
+                return;
+            }
+
+            if (registeredPartyMembers.Contains(unit))
+            {
+                Debug.LogWarning($"PartyManager: Unit {unit.UnitName} is already registered!");
+                return;
+            }
+
+            registeredPartyMembers.Add(unit);
+            Debug.Log($"PartyManager: Registered {unit.UnitName}");
+        }
+
+        /// <summary>
+        /// Unregister a unit from the party manager.
+        /// </summary>
+        public void UnregisterUnit(Unit unit)
+        {
+            if (unit == null) return;
+
+            if (registeredPartyMembers.Remove(unit))
+            {
+                Debug.Log($"PartyManager: Unregistered {unit.UnitName}");
+                
+                // If the unregistered unit was selected, clear selection
+                if (selectedUnit == unit)
+                {
+                    selectedUnit = null;
+                    UpdateSelectionRing();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Get all player-controlled units registered with the party manager.
         /// </summary>
         public List<Unit> GetPartyMembers()
         {
-            Unit[] allUnits = FindObjectsByType<Unit>(FindObjectsSortMode.None);
-            List<Unit> party = new List<Unit>();
-
-            foreach (Unit unit in allUnits)
-            {
-                if (unit.IsPlayerControlled)
-                {
-                    party.Add(unit);
-                }
-            }
-
-            return party;
+            // Return a copy to prevent external modification
+            return new List<Unit>(registeredPartyMembers);
         }
 
         /// <summary>
@@ -99,20 +144,39 @@ namespace Riftbourne.Core
 
         private void UpdateSelectionRing()
         {
-            // Destroy old ring
+            // Return old ring to pool
             if (currentSelectionRing != null)
             {
-                Destroy(currentSelectionRing);
+                if (selectionRingPool != null)
+                {
+                    selectionRingPool.Return(currentSelectionRing);
+                }
+                else
+                {
+                    Destroy(currentSelectionRing);
+                }
+                currentSelectionRing = null;
             }
 
             if (selectedUnit == null) return;
 
-            // Create new ring
-            if (selectionRingPrefab != null)
+            // Get ring from pool or create new
+            if (selectionRingPool != null)
             {
+                currentSelectionRing = selectionRingPool.Get();
+                if (currentSelectionRing != null)
+                {
+                    currentSelectionRing.transform.SetParent(selectedUnit.transform);
+                    currentSelectionRing.transform.localPosition = new Vector3(0, 0.01f, 0);
+                    currentSelectionRing.transform.localRotation = Quaternion.Euler(90, 0, 0);
+                }
+            }
+            else if (selectionRingPrefab != null)
+            {
+                // Fallback to instantiate if no pool
                 currentSelectionRing = Instantiate(selectionRingPrefab, selectedUnit.transform);
-                currentSelectionRing.transform.localPosition = new Vector3(0, 0.01f, 0); // Just above ground
-                currentSelectionRing.transform.localRotation = Quaternion.Euler(90, 0, 0); // Flat on ground
+                currentSelectionRing.transform.localPosition = new Vector3(0, 0.01f, 0);
+                currentSelectionRing.transform.localRotation = Quaternion.Euler(90, 0, 0);
             }
             else
             {

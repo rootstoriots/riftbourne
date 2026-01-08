@@ -59,6 +59,23 @@ namespace Riftbourne.Characters
         public bool TeachesSkills => grantedSkills != null && grantedSkills.Count > 0;
         
         /// <summary>
+        /// Gets the primary slot for this equipment.
+        /// Returns first compatible slot.
+        /// </summary>
+        public EquipmentSlot PrimarySlot
+        {
+            get
+            {
+                if (compatibleSlots != null && compatibleSlots.Count > 0)
+                {
+                    return compatibleSlots[0];
+                }
+                // Return MeleeWeapon as default if no slots defined (shouldn't happen in practice)
+                return EquipmentSlot.MeleeWeapon;
+            }
+        }
+        
+        /// <summary>
         /// Can this item be equipped in the specified slot?
         /// </summary>
         public bool CanEquipInSlot(EquipmentSlot slot)

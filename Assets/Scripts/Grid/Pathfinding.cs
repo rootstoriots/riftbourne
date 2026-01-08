@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using Riftbourne.Characters;
+using Riftbourne.Combat;
 
 namespace Riftbourne.Grid
 {
@@ -25,11 +26,30 @@ namespace Riftbourne.Grid
         public HashSet<GridCell> GetReachableCells(Unit unit, int maxRange)
         {
             HashSet<GridCell> reachable = new HashSet<GridCell>();
+            
+            // Validate unit and its grid position
+            if (unit == null)
+            {
+                Debug.LogError("Pathfinding.GetReachableCells: Unit is null!");
+                return reachable;
+            }
+            
+            // Check if unit's grid position is valid
+            if (!gridManager.IsValidGridPosition(unit.GridX, unit.GridY))
+            {
+                Debug.LogError($"Pathfinding.GetReachableCells: Unit {unit.UnitName} has invalid grid position ({unit.GridX}, {unit.GridY})! World position: {unit.transform.position}");
+                return reachable;
+            }
+            
             Queue<PathNode> frontier = new Queue<PathNode>();
 
             // Start from current position
             GridCell startCell = gridManager.GetCell(unit.GridX, unit.GridY);
-            if (startCell == null) return reachable;
+            if (startCell == null)
+            {
+                Debug.LogError($"Pathfinding.GetReachableCells: Could not get grid cell at ({unit.GridX}, {unit.GridY}) for unit {unit.UnitName}");
+                return reachable;
+            }
 
             // Track visited cells and their costs
             Dictionary<GridCell, int> costSoFar = new Dictionary<GridCell, int>();
@@ -75,10 +95,34 @@ namespace Riftbourne.Grid
         /// </summary>
         public List<GridCell> GetPath(Unit unit, int targetX, int targetY)
         {
+            // Validate unit and its grid position
+            if (unit == null)
+            {
+                Debug.LogError("Pathfinding.GetPath: Unit is null!");
+                return null;
+            }
+            
+            // Check if unit's grid position is valid
+            if (!gridManager.IsValidGridPosition(unit.GridX, unit.GridY))
+            {
+                Debug.LogError($"Pathfinding.GetPath: Unit {unit.UnitName} has invalid grid position ({unit.GridX}, {unit.GridY})! World position: {unit.transform.position}");
+                return null;
+            }
+            
             GridCell startCell = gridManager.GetCell(unit.GridX, unit.GridY);
             GridCell endCell = gridManager.GetCell(targetX, targetY);
             
-            if (startCell == null || endCell == null) return null;
+            if (startCell == null)
+            {
+                Debug.LogError($"Pathfinding.GetPath: Could not get start cell at ({unit.GridX}, {unit.GridY}) for unit {unit.UnitName}");
+                return null;
+            }
+            
+            if (endCell == null)
+            {
+                Debug.LogWarning($"Pathfinding.GetPath: Target cell ({targetX}, {targetY}) is invalid or out of bounds");
+                return null;
+            }
             
             // Use A* pathfinding
             Dictionary<GridCell, GridCell> cameFrom = new Dictionary<GridCell, GridCell>();
@@ -122,18 +166,31 @@ namespace Riftbourne.Grid
         
         /// <summary>
         /// Reconstruct path from cameFrom dictionary.
+        /// Returns path including start and end cells.
         /// </summary>
         private List<GridCell> ReconstructPath(Dictionary<GridCell, GridCell> cameFrom, GridCell start, GridCell end)
         {
             List<GridCell> path = new List<GridCell>();
             GridCell current = end;
             
-            while (current != start)
+            // Build path backwards from end to start
+            while (current != null && current != start)
             {
                 path.Add(current);
-                current = cameFrom[current];
+                if (cameFrom.ContainsKey(current))
+                {
+                    current = cameFrom[current];
+                }
+                else
+                {
+                    break;
+                }
             }
             
+            // Add start cell
+            path.Add(start);
+            
+            // Reverse to get path from start to end
             path.Reverse();
             return path;
         }
@@ -176,9 +233,24 @@ namespace Riftbourne.Grid
             if (cell.OccupyingUnit == null) return false;
             if (cell.OccupyingUnit == movingUnit) return false;
 
-            // Ally doesn't block (same team)
-            if (cell.OccupyingUnit.IsPlayerControlled == movingUnit.IsPlayerControlled)
-                return false;
+            // Ally doesn't block (same faction or allied)
+            FactionRelationship factionRel = FactionRelationship.Instance;
+            if (factionRel == null)
+            {
+                factionRel = Object.FindFirstObjectByType<FactionRelationship>();
+            }
+            
+            if (factionRel != null)
+            {
+                if (factionRel.AreAllied(movingUnit.Faction, cell.OccupyingUnit.Faction))
+                    return false;
+            }
+            else
+            {
+                // Fallback: same faction = ally
+                if (cell.OccupyingUnit.Faction == movingUnit.Faction)
+                    return false;
+            }
 
             // Enemy blocks!
             return true;

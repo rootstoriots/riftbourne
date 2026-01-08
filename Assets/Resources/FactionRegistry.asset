@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f90b81de2481e564ba882f64f0ed57b1, type: 3}
+  m_Name: FactionRegistry
+  m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Combat.FactionRegistry
+  registeredFactions:
+  - {fileID: 11400000, guid: 6b28fd28664c1fa4783b876336e039b7, type: 2}
+  - {fileID: 11400000, guid: 09948662c25fb124ab794e568c5fe151, type: 2}
+  - {fileID: 11400000, guid: f70c9ff50faba8a4081a0d9a8c0e7000, type: 2}
+  - {fileID: 11400000, guid: cfce2e28519af6140b312e9ee6d3b9de, type: 2}
+  playerFaction: {fileID: 0}
+  faction1: {fileID: 0}
+  faction2: {fileID: 0}
+  faction3: {fileID: 0}
+  neutralFaction: {fileID: 0}

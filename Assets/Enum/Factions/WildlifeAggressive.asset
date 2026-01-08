@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d9b552230bc01c049a67376a2d36da0c, type: 3}
+  m_Name: WildlifeAggressive
+  m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Combat.FactionData
+  factionName: Wildlife
+  description: Faction description
+  factionColor: {r: 1, g: 1, b: 1, a: 1}
+  isPlayerFaction: 0
+  isNeutralByDefault: 0
+  relationships:
+  - targetFaction: {fileID: 11400000, guid: 09948662c25fb124ab794e568c5fe151, type: 2}
+    relationship: 0
+  - targetFaction: {fileID: 11400000, guid: f70c9ff50faba8a4081a0d9a8c0e7000, type: 2}
+    relationship: 0
+  - targetFaction: {fileID: 11400000, guid: 6b28fd28664c1fa4783b876336e039b7, type: 2}
+    relationship: 0

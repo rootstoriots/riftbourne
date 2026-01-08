@@ -1,15 +1,60 @@
 using UnityEngine;
 using Riftbourne.Characters;
+using Riftbourne.Core;
 
 namespace Riftbourne.Combat
 {
+    /// <summary>
+    /// Service for executing attack actions.
+    /// Registered with ManagerRegistry for dependency injection.
+    /// </summary>
     public class AttackAction : MonoBehaviour
     {
+        public static AttackAction Instance 
+        { 
+            get 
+            {
+                if (_instance == null)
+                {
+                    // Auto-create if not in scene
+                    GameObject go = new GameObject("AttackAction");
+                    _instance = go.AddComponent<AttackAction>();
+                    Debug.Log("AttackAction: Auto-created instance (not found in scene)");
+                }
+                return _instance;
+            }
+            private set { _instance = value; }
+        }
+        private static AttackAction _instance;
+
+        private void Awake()
+        {
+            if (_instance == null)
+            {
+                _instance = this;
+                ManagerRegistry.Register(this);
+                Debug.Log("AttackAction: Registered with ManagerRegistry");
+            }
+            else if (_instance != this)
+            {
+                Destroy(gameObject);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_instance == this)
+            {
+                ManagerRegistry.Unregister(this);
+                _instance = null;
+            }
+        }
+
         /// <summary>
         /// Execute a melee attack from attacker to target.
         /// Returns true if attack was successful.
         /// </summary>
-        public static bool ExecuteMeleeAttack(Unit attacker, Unit target)
+        public bool ExecuteMeleeAttack(Unit attacker, Unit target)
         {
             // Validate units exist and are alive
             if (attacker == null || target == null)
@@ -44,12 +89,14 @@ namespace Riftbourne.Combat
             
             // Record action and award XP
             attacker.RecordAction();  // Award SP based on action count
-            attacker.AwardXP(5);
+            int baseXP = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
+            attacker.AwardXP(baseXP);
             
             // Award bonus XP if target died
             if (!target.IsAlive)
             {
-                attacker.AwardXP(25);  // Kill bonus
+                int killBonus = GameConstants.Instance != null ? GameConstants.Instance.KillBonusXP : 25;
+                attacker.AwardXP(killBonus);
             }
 
             // Mark attacker as acted (caller can still decide when to end turn)
@@ -62,7 +109,7 @@ namespace Riftbourne.Combat
         /// Check if two units are adjacent on the grid (Chebyshev distance = 1).
         /// Allows attacks in all 8 directions (cardinal + diagonal).
         /// </summary>
-        private static bool AreUnitsAdjacent(Unit unit1, Unit unit2)
+        private bool AreUnitsAdjacent(Unit unit1, Unit unit2)
         {
             int dx = Mathf.Abs(unit1.GridX - unit2.GridX);
             int dy = Mathf.Abs(unit1.GridY - unit2.GridY);

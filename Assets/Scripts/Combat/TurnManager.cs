@@ -1,4 +1,5 @@
 using UnityEngine;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Riftbourne.Characters;
@@ -15,6 +16,22 @@ namespace Riftbourne.Combat
 
         // Flexible initiative window
         private List<Unit> currentTurnWindow = new List<Unit>();
+
+        // Events
+        /// <summary>
+        /// Event raised when the current turn window changes (units that can act).
+        /// </summary>
+        public event Action<List<Unit>> OnTurnWindowChanged;
+
+        /// <summary>
+        /// Event raised when the current unit changes.
+        /// </summary>
+        public event Action<Unit> OnCurrentUnitChanged;
+
+        /// <summary>
+        /// Event raised when a unit ends their turn.
+        /// </summary>
+        public event Action<Unit> OnUnitTurnEnded;
 
         // Public properties
         public Unit CurrentUnit { get; private set; }
@@ -67,10 +84,86 @@ namespace Riftbourne.Combat
         private int lastHazardUpdateRound = 0;
         private int currentRound = 1;
 
+        // Coroutine tracking to prevent multiple enemy window coroutines
+        private Coroutine currentEnemyWindowCoroutine;
+
+        private void Awake()
+        {
+            ManagerRegistry.Register(this);
+        }
+
+        private void OnDestroy()
+        {
+            // Cancel any running enemy window coroutine
+            if (currentEnemyWindowCoroutine != null)
+            {
+                StopCoroutine(currentEnemyWindowCoroutine);
+                currentEnemyWindowCoroutine = null;
+            }
+            
+            ManagerRegistry.Unregister(this);
+        }
+
         private void Start()
         {
-            hazardManager = FindFirstObjectByType<HazardManager>();
+            hazardManager = ManagerRegistry.Get<HazardManager>();
+            if (hazardManager == null)
+            {
+                hazardManager = FindFirstObjectByType<HazardManager>();
+                if (hazardManager == null)
+                {
+                    Debug.LogError("TurnManager: HazardManager not found in scene! Make sure HazardManager GameObject exists.");
+                }
+            }
+            
+            // Ensure all factions are registered before initializing combat
+            RegisterAllFactionsFromUnits();
+            
             InitializeCombat();
+        }
+
+        /// <summary>
+        /// Register all faction data from units in the scene to ensure proper initialization.
+        /// This prevents premature combat end due to unregistered factions.
+        /// </summary>
+        private void RegisterAllFactionsFromUnits()
+        {
+            FactionRegistry registry = Resources.Load<FactionRegistry>("FactionRegistry");
+            if (registry == null)
+            {
+                Debug.LogWarning("TurnManager: FactionRegistry not found in Resources! Factions may not be properly initialized.");
+                return;
+            }
+
+            // Find all units and register their factions
+            Unit[] allUnitsInScene = FindObjectsByType<Unit>(FindObjectsSortMode.None);
+            HashSet<FactionData> factionsToRegister = new HashSet<FactionData>();
+
+            foreach (Unit unit in allUnitsInScene)
+            {
+                if (unit != null && unit.FactionData != null)
+                {
+                    factionsToRegister.Add(unit.FactionData);
+                }
+            }
+
+            // Register all unique factions
+            foreach (var faction in factionsToRegister)
+            {
+                registry.RegisterFaction(faction);
+            }
+
+            // Build lookup to ensure enum mappings are created
+            registry.BuildLookup();
+
+            // Apply relationships to FactionRelationship component
+            FactionRelationship factionRel = FactionRelationship.Instance ?? FindFirstObjectByType<FactionRelationship>();
+            if (factionRel != null)
+            {
+                registry.ApplyRelationshipsTo(factionRel);
+            }
+
+            Debug.Log($"TurnManager: Registered {factionsToRegister.Count} factions from units in scene.");
         }
 
         /// <summary>
@@ -88,14 +181,18 @@ namespace Riftbourne.Combat
                 allUnits.AddRange(foundUnits);
 
                 // Sort by Speed (higher goes first)
-                // Tiebreaker: Player-controlled units go first if speed is tied
+                // Tiebreaker: Player faction goes first if speed is tied
                 allUnits.Sort((a, b) =>
                 {
                     int speedCompare = b.Speed.CompareTo(a.Speed);
                     if (speedCompare != 0)
                         return speedCompare;
-                    // Tied speed - player units go first
-                    return b.IsPlayerControlled.CompareTo(a.IsPlayerControlled);
+                    // Tied speed - player faction goes first
+                    if (a.Faction == Faction.Player && b.Faction != Faction.Player)
+                        return -1;
+                    if (a.Faction != Faction.Player && b.Faction == Faction.Player)
+                        return 1;
+                    return 0;
                 });
             }
             else
@@ -116,7 +213,7 @@ namespace Riftbourne.Combat
                 Debug.Log($"Combat started! Turn window: {string.Join(", ", currentTurnWindow.Select(u => u.UnitName))}");
 
                 // Auto-select first player unit if it's in the window
-                if (CurrentUnit.IsPlayerControlled && PartyManager.Instance != null)
+                if (CurrentUnit.Faction == Faction.Player && PartyManager.Instance != null)
                 {
                     PartyManager.Instance.SelectUnit(CurrentUnit);
                 }
@@ -124,6 +221,36 @@ namespace Riftbourne.Combat
             else
             {
                 Debug.LogWarning("TurnManager: No units found in scene!");
+            }
+        }
+
+        /// <summary>
+        /// Unregister a unit from turn management.
+        /// </summary>
+        public void UnregisterUnit(Unit unit)
+        {
+            if (unit == null) return;
+
+            if (allUnits.Remove(unit))
+            {
+                Debug.Log($"TurnManager: Unregistered {unit.UnitName}");
+                
+                // Remove from current window if present
+                currentTurnWindow.Remove(unit);
+                
+                // If current unit was removed, advance to next
+                if (CurrentUnit == unit)
+                {
+                    CurrentUnit = null;
+                    if (currentTurnWindow.Count > 0)
+                    {
+                        CurrentUnit = currentTurnWindow[0];
+                    }
+                    else
+                    {
+                        AdvanceToNextWindow();
+                    }
+                }
             }
         }
 
@@ -155,8 +282,12 @@ namespace Riftbourne.Combat
                 int speedCompare = b.Speed.CompareTo(a.Speed);
                 if (speedCompare != 0)
                     return speedCompare;
-                // Tied speed - player units go first
-                return b.IsPlayerControlled.CompareTo(a.IsPlayerControlled);
+                // Tied speed - player faction goes first
+                if (a.Faction == Faction.Player && b.Faction != Faction.Player)
+                    return -1;
+                if (a.Faction != Faction.Player && b.Faction == Faction.Player)
+                    return 1;
+                return 0;
             });
 
             Debug.Log($"TurnManager: Registered late unit {unit.UnitName} (Speed: {unit.Speed})");
@@ -190,16 +321,16 @@ namespace Riftbourne.Combat
             currentTurnWindow.Add(firstUnit);
             CurrentUnit = firstUnit;
 
-            // Add consecutive allies
-            bool isPlayerWindow = firstUnit.IsPlayerControlled;
+            // Add consecutive allies (same faction)
+            Faction windowFaction = firstUnit.Faction;
             int index = currentTurnIndex + 1;
 
             while (index < allUnits.Count)
             {
                 Unit unit = allUnits[index];
 
-                // Stop if we hit an enemy (different team)
-                if (unit.IsPlayerControlled != isPlayerWindow)
+                // Stop if we hit a different faction
+                if (unit.Faction != windowFaction)
                     break;
 
                 if (!unit.IsAlive)
@@ -213,12 +344,32 @@ namespace Riftbourne.Combat
             }
 
             // Reset action flags for all units in new window
-            //foreach (Unit unit in currentTurnWindow)
-            //{
-            //    unit.OnTurnStart();
-            //}
+            // This resets movement points and action flags at the start of their turn window
+            // Only call OnTurnStart if the unit is not currently moving (to avoid interfering with movement)
+            foreach (Unit unit in currentTurnWindow)
+            {
+                if (!unit.IsMoving)
+                {
+                    unit.OnTurnStart();
+                }
+                else
+                {
+                    // Unit is still moving - delay OnTurnStart until movement completes
+                    // This prevents interference with ongoing movement when rounds wrap
+                    Debug.Log($"[TURN WINDOW] {unit.UnitName} is still moving, will reset on turn start after movement completes");
+                    // Start coroutine to call OnTurnStart when movement completes
+                    StartCoroutine(DelayedOnTurnStart(unit));
+                }
+            }
 
             Debug.Log($"[TURN WINDOW] {string.Join(", ", currentTurnWindow.Select(u => u.UnitName))} can act");
+
+            // Raise events (both local and global)
+            var windowCopy = new List<Unit>(currentTurnWindow);
+            OnTurnWindowChanged?.Invoke(windowCopy);
+            GameEvents.RaiseTurnWindowChanged(windowCopy);
+            OnCurrentUnitChanged?.Invoke(CurrentUnit);
+            GameEvents.RaiseCurrentUnitChanged(CurrentUnit);
         }
 
         /// <summary>
@@ -231,7 +382,12 @@ namespace Riftbourne.Combat
             // If no unit provided, try to get from PartyManager (for player units)
             if (actingUnit == null)
             {
-                actingUnit = PartyManager.Instance?.SelectedUnit;
+                if (PartyManager.Instance == null)
+                {
+                    Debug.LogWarning("EndTurn called but PartyManager.Instance is null!");
+                    return;
+                }
+                actingUnit = PartyManager.Instance.SelectedUnit;
             }
 
             if (actingUnit == null)
@@ -241,13 +397,54 @@ namespace Riftbourne.Combat
             }
 
             // Make sure this unit is actually in the current window
-            if (!currentTurnWindow.Contains(actingUnit))
+            if (currentTurnWindow == null || !currentTurnWindow.Contains(actingUnit))
             {
                 Debug.LogWarning($"{actingUnit.UnitName} tried to end turn but is not in current window!");
                 return;
             }
 
             Debug.Log($"{actingUnit.UnitName} ended their turn");
+
+            // Apply hazard damage if unit is ending their turn on a hazard
+            // NOTE: This applies to ALL units (both player and enemy/AI units)
+            if (hazardManager == null)
+            {
+                Debug.LogWarning($"[TURN END] HazardManager is null, cannot check for hazards for {actingUnit.UnitName}");
+            }
+            else
+            {
+                GridManager gridManager = ManagerRegistry.Get<GridManager>();
+                if (gridManager == null)
+                {
+                    Debug.LogWarning($"[TURN END] GridManager is null, cannot check for hazards for {actingUnit.UnitName}");
+                }
+                else if (!gridManager.IsValidGridPosition(actingUnit.GridX, actingUnit.GridY))
+                {
+                    Debug.LogWarning($"[TURN END] {actingUnit.UnitName} has invalid grid position ({actingUnit.GridX}, {actingUnit.GridY})");
+                }
+                else
+                {
+                    Debug.Log($"[TURN END] {actingUnit.UnitName} checking for hazards at ({actingUnit.GridX}, {actingUnit.GridY})");
+                    GridCell currentCell = gridManager.GetCell(actingUnit.GridX, actingUnit.GridY);
+                    if (currentCell == null)
+                    {
+                        Debug.LogWarning($"[TURN END] {actingUnit.UnitName} - Cell at ({actingUnit.GridX}, {actingUnit.GridY}) is null!");
+                    }
+                    else if (currentCell.Hazard == null)
+                    {
+                        Debug.Log($"[TURN END] {actingUnit.UnitName} at ({actingUnit.GridX}, {actingUnit.GridY}) - no hazard on cell");
+                    }
+                    else
+                    {
+                        Debug.Log($"[TURN END] {actingUnit.UnitName} ending turn on {currentCell.Hazard.Type} hazard at ({actingUnit.GridX}, {actingUnit.GridY})");
+                        hazardManager.ApplyHazardDamageToUnit(actingUnit, currentCell);
+                    }
+                }
+            }
+
+            // Raise event for unit ending turn (both local and global)
+            OnUnitTurnEnded?.Invoke(actingUnit);
+            GameEvents.RaiseUnitTurnEnded(actingUnit);
 
             // Remove this unit from allUnits (wherever they are)
             int unitIndex = allUnits.IndexOf(actingUnit);
@@ -258,12 +455,20 @@ namespace Riftbourne.Combat
                 // Add to end
                 allUnits.Add(actingUnit);
 
-                // DON'T adjust currentTurnIndex at all!
-                // When we remove a unit from the list and re-add to end,
-                // currentTurnIndex should stay the same because:
-                // - Units in the window are tracked separately
-                // - We never rely on currentTurnIndex to find "next" unit
-                // - We only use it to rebuild the window when it's empty
+                // Adjust currentTurnIndex if the removed unit was before or at the current index
+                // If we removed a unit at or before currentTurnIndex, we need to adjust
+                // because all units after it shifted left by one position
+                if (unitIndex <= currentTurnIndex)
+                {
+                    // If we removed the unit at currentTurnIndex, the next unit is now at that position
+                    // So we don't need to increment - currentTurnIndex already points to the next unit
+                    // But if we removed a unit before currentTurnIndex, we need to decrement
+                    if (unitIndex < currentTurnIndex)
+                    {
+                        currentTurnIndex--;
+                    }
+                    // If unitIndex == currentTurnIndex, currentTurnIndex now points to the next unit (correct)
+                }
             }
 
             // Remove from current window
@@ -271,17 +476,27 @@ namespace Riftbourne.Combat
 
             Debug.Log($"Turn order now: [{string.Join(", ", allUnits.Select(u => u.UnitName))}]");
             Debug.Log($"Window now: [{string.Join(", ", currentTurnWindow.Select(u => u.UnitName))}]");
+            Debug.Log($"Current turn index: {currentTurnIndex} (points to: {(currentTurnIndex < allUnits.Count ? allUnits[currentTurnIndex].UnitName : "OUT OF BOUNDS")})");
 
             // Check if window is now empty
             if (currentTurnWindow.Count == 0)
             {
                 Debug.Log("Window empty - advancing to next window");
+                // currentTurnIndex already points to the next unit (we adjusted it above)
+                // So we can directly advance to the next window without incrementing
                 AdvanceToNextWindow();
+                // Note: AdvanceToNextWindow() will call CalculateTurnWindow() which raises OnTurnWindowChanged
+                // So we don't need to raise the event here with an empty window
             }
             else
             {
-                // Window still has units - let player choose next or AI acts
-                if (currentTurnWindow[0].IsPlayerControlled)
+                // Window still has units - raise event for window change (unit removed) - both local and global
+                var windowCopy = new List<Unit>(currentTurnWindow);
+                OnTurnWindowChanged?.Invoke(windowCopy);
+                GameEvents.RaiseTurnWindowChanged(windowCopy);
+                
+                // Let player choose next or AI acts
+                if (currentTurnWindow[0].Faction == Faction.Player)
                 {
                     // Auto-select first remaining unit in window
                     if (PartyManager.Instance != null)
@@ -306,8 +521,8 @@ namespace Riftbourne.Combat
         /// </summary>
         private void AdvanceToNextWindow()
         {
-            // Current window is empty, so currentTurnIndex should be at next unit
-            // But first check if we've wrapped around
+            // Current window is empty, so advance to next unit
+            // Check if we've wrapped around to a new round
             if (currentTurnIndex >= allUnits.Count)
             {
                 currentTurnIndex = 0;
@@ -315,12 +530,36 @@ namespace Riftbourne.Combat
                 Debug.Log($"=== ROUND {currentRound} ===");
 
                 // Update hazards at start of new round
-                if (hazardManager != null && currentRound > lastHazardUpdateRound)
+                if (currentRound > lastHazardUpdateRound)
                 {
-                    hazardManager.UpdateHazards();
-                    lastHazardUpdateRound = currentRound;
-                    Debug.Log("Hazards updated (durations decremented)");
+                    // Ensure hazardManager is available
+                    if (hazardManager == null)
+                    {
+                        hazardManager = ManagerRegistry.Get<HazardManager>();
+                        if (hazardManager == null)
+                        {
+                            hazardManager = FindFirstObjectByType<HazardManager>();
+                        }
+                    }
+                    
+                    if (hazardManager != null)
+                    {
+                        hazardManager.UpdateHazards();
+                        lastHazardUpdateRound = currentRound;
+                        Debug.Log("Hazards updated (durations decremented)");
+                    }
+                    else
+                    {
+                        Debug.LogWarning("TurnManager: Cannot update hazards - HazardManager not available");
+                    }
                 }
+            }
+            
+            // Ensure we don't go out of bounds
+            if (currentTurnIndex >= allUnits.Count)
+            {
+                Debug.LogWarning("TurnManager: currentTurnIndex is out of bounds after wrap check!");
+                currentTurnIndex = 0;
             }
 
             // Calculate new turn window
@@ -332,8 +571,8 @@ namespace Riftbourne.Combat
                 return;
             }
 
-            // If this is an enemy window, let AI control
-            if (currentTurnWindow.Count > 0 && !currentTurnWindow[0].IsPlayerControlled)
+            // If this is a non-player window, let AI control
+            if (currentTurnWindow.Count > 0 && currentTurnWindow[0].Faction != Faction.Player)
             {
                 ExecuteEnemyWindow();
             }
@@ -389,7 +628,15 @@ namespace Riftbourne.Combat
         private void ExecuteEnemyWindow()
         {
             Debug.Log($"--- Enemy turn window: {string.Join(", ", currentTurnWindow.Select(u => u.UnitName))} ---");
-            StartCoroutine(ExecuteEnemyWindowSequentially());
+            
+            // Stop any existing coroutine to prevent multiple coroutines running simultaneously
+            if (currentEnemyWindowCoroutine != null)
+            {
+                StopCoroutine(currentEnemyWindowCoroutine);
+                Debug.LogWarning("[ENEMY WINDOW] Stopped existing enemy window coroutine before starting new one");
+            }
+            
+            currentEnemyWindowCoroutine = StartCoroutine(ExecuteEnemyWindowSequentially());
         }
 
         /// <summary>
@@ -397,33 +644,137 @@ namespace Riftbourne.Combat
         /// </summary>
         private System.Collections.IEnumerator ExecuteEnemyWindowSequentially()
         {
-            // Make a copy since EndTurn() modifies the list
-            List<Unit> enemiesInWindow = new List<Unit>(currentTurnWindow);
+            // Make a copy of the original window - this is the window we're processing
+            // Store original positions to detect when enemies are moved to end (EndTurn called)
+            List<Unit> enemiesToProcess = new List<Unit>(currentTurnWindow);
+            Dictionary<Unit, int> originalPositions = new Dictionary<Unit, int>();
+            
+            // Record original positions
+            for (int i = 0; i < enemiesToProcess.Count; i++)
+            {
+                originalPositions[enemiesToProcess[i]] = allUnits.IndexOf(enemiesToProcess[i]);
+            }
+            
+            Debug.Log($"[ENEMY WINDOW] Processing {enemiesToProcess.Count} enemies: [{string.Join(", ", enemiesToProcess.Select(u => u.UnitName))}]");
 
-            foreach (Unit enemy in enemiesInWindow)
+            foreach (Unit enemy in enemiesToProcess)
             {
                 if (!enemy.IsAlive)
+                {
+                    Debug.Log($"[ENEMY WINDOW] {enemy.UnitName} is dead, ending turn automatically");
+                    // Dead enemies should still be moved to end of turn order
+                    if (allUnits.Contains(enemy))
+                    {
+                        EndTurn(enemy);
+                    }
                     continue;
+                }
 
                 Debug.Log($"[ENEMY TURN] {enemy.UnitName} is acting...");
                 AIController ai = enemy.GetComponent<AIController>();
                 if (ai != null)
                 {
+                    // Use event-based completion instead of polling
+                    bool turnCompleted = false;
+                    System.Action<Unit> onTurnCompleteHandler = (unit) =>
+                    {
+                        if (unit == enemy)
+                        {
+                            turnCompleted = true;
+                        }
+                    };
+                    
+                    // Subscribe to turn completion event
+                    ai.OnTurnComplete += onTurnCompleteHandler;
+                    
+                    // Start the AI turn
                     ai.TakeTurn();
-                    // Wait for AI thinking delay + action execution
-                    yield return new WaitForSeconds(1.5f);
+                    
+                    // Wait for turn completion with timeout
+                    float maxWaitTime = 5f;
+                    float elapsedTime = 0f;
+                    float checkInterval = 0.1f;
+                    
+                    while (!turnCompleted && elapsedTime < maxWaitTime)
+                    {
+                        yield return new WaitForSeconds(checkInterval);
+                        elapsedTime += checkInterval;
+                    }
+                    
+                    // Unsubscribe from event
+                    ai.OnTurnComplete -= onTurnCompleteHandler;
+                    
+                    if (!turnCompleted)
+                    {
+                        Debug.LogWarning($"[ENEMY WINDOW] {enemy.UnitName} took too long ({elapsedTime}s), cancelling turn and forcing end");
+                        // Cancel the AI turn and force end if it's taking too long
+                        ai.CancelTurn();
+                        if (allUnits.Contains(enemy) && currentTurnWindow.Contains(enemy))
+                        {
+                            EndTurn(enemy);
+                        }
+                    }
+                    else
+                    {
+                        Debug.Log($"[ENEMY WINDOW] {enemy.UnitName} completed their turn");
+                    }
                 }
                 else
                 {
-                    Debug.LogWarning($"{enemy.UnitName} has no AIController!");
+                    Debug.LogWarning($"{enemy.UnitName} has no AIController! Ending turn automatically.");
+                    // Force end turn if no AI
+                    if (allUnits.Contains(enemy))
+                    {
+                        EndTurn(enemy);
+                    }
                 }
 
-                // Note: EndTurn() is called by AI or movement completion
-                // Wait a bit for it to process
+                // Small delay between enemy turns for visual clarity
                 yield return new WaitForSeconds(0.1f);
             }
 
-            Debug.Log("[ENEMY WINDOW] All enemies finished");
+            Debug.Log($"[ENEMY WINDOW] All {enemiesToProcess.Count} enemies in window processed.");
+            
+            // Clear coroutine reference when done
+            currentEnemyWindowCoroutine = null;
+        }
+
+        /// <summary>
+        /// Coroutine to call OnTurnStart for a unit when it finishes moving.
+        /// </summary>
+        private System.Collections.IEnumerator DelayedOnTurnStart(Unit unit)
+        {
+            if (unit == null)
+            {
+                yield break;
+            }
+
+            // Wait until unit stops moving
+            float maxWaitTime = 10f; // Safety timeout
+            float elapsedTime = 0f;
+            float checkInterval = 0.1f;
+
+            while (unit.IsMoving && elapsedTime < maxWaitTime)
+            {
+                yield return new WaitForSeconds(checkInterval);
+                elapsedTime += checkInterval;
+            }
+
+            if (elapsedTime >= maxWaitTime)
+            {
+                Debug.LogWarning($"[TURN WINDOW] {unit.UnitName} took too long to finish moving, calling OnTurnStart anyway");
+            }
+
+            // Verify unit is still valid and in the current window before calling OnTurnStart
+            if (unit != null && unit.IsAlive && currentTurnWindow.Contains(unit))
+            {
+                Debug.Log($"[TURN WINDOW] Calling delayed OnTurnStart for {unit.UnitName}");
+                unit.OnTurnStart();
+            }
+            else
+            {
+                Debug.Log($"[TURN WINDOW] Skipping delayed OnTurnStart for {unit?.UnitName ?? "NULL"} - unit is null, dead, or no longer in window");
+            }
         }
 
         /// <summary>
@@ -449,33 +800,63 @@ namespace Riftbourne.Combat
         }
 
         /// <summary>
-        /// Check if combat is over (only one team remaining).
+        /// Check if combat is over (player faction eliminated, or all hostile factions eliminated).
+        /// Uses FactionRelationship to properly determine hostile factions.
         /// </summary>
         public bool IsCombatOver()
         {
-            int alivePlayerUnits = 0;
-            int aliveEnemyUnits = 0;
+            if (allUnits == null || allUnits.Count == 0)
+            {
+                return true; // No units = combat over
+            }
+
+            FactionRelationship factionRel = FactionRelationship.Instance ?? FindFirstObjectByType<FactionRelationship>();
+            if (factionRel == null)
+            {
+                Debug.LogWarning("TurnManager: FactionRelationship not found! Cannot properly determine combat end.");
+                return false;
+            }
+
+            // Count alive units and check factions
+            bool playerFactionAlive = false;
+            HashSet<Faction> hostileFactions = new HashSet<Faction>();
+            HashSet<Faction> allAliveFactions = new HashSet<Faction>();
 
             foreach (Unit unit in allUnits)
             {
-                if (unit.IsAlive)
+                if (unit == null || !unit.IsAlive) continue;
+
+                Faction unitFaction = unit.Faction;
+                allAliveFactions.Add(unitFaction);
+
+                // Check if this is player faction
+                if (unitFaction == Faction.Player || (unit.FactionData != null && unit.FactionData.IsPlayerFaction))
                 {
-                    if (unit.IsPlayerControlled)
-                        alivePlayerUnits++;
-                    else
-                        aliveEnemyUnits++;
+                    playerFactionAlive = true;
+                }
+                else
+                {
+                    // Check if this faction is hostile to player
+                    if (factionRel.AreHostile(Faction.Player, unitFaction))
+                    {
+                        hostileFactions.Add(unitFaction);
+                    }
                 }
             }
 
-            if (alivePlayerUnits == 0)
+            // Check if player faction is eliminated
+            if (!playerFactionAlive)
             {
-                Debug.Log("Combat Over: Player defeated!");
+                Debug.Log("Combat Over: Player faction defeated!");
+                GameEvents.RaiseCombatEnded(false);
                 return true;
             }
 
-            if (aliveEnemyUnits == 0)
+            // Check if all hostile factions are eliminated
+            if (hostileFactions.Count == 0 && playerFactionAlive)
             {
-                Debug.Log("Combat Over: Player victorious!");
+                Debug.Log("Combat Over: All hostile factions eliminated! Player faction victorious!");
+                GameEvents.RaiseCombatEnded(true);
                 return true;
             }
 

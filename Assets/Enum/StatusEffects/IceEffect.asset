@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0beb51d287527d542bf47136a7faedc5, type: 3}
+  m_Name: IceEffect
+  m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Combat.StatusEffectData
+  effectType: 0
+  effectName: Burn
+  description: Deals damage over time
+  dealsDamage: 1
+  damagePerTurn: 5
+  healsOverTime: 0
+  healingPerTurn: 0
+  modifiesMovement: 0
+  movementMultiplier: 1
+  preventsActions: 0
+  preventsMovement: 0
+  displayColor: {r: 1, g: 0, b: 0, a: 1}
+  icon: {fileID: 0}

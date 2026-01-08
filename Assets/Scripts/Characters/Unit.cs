@@ -3,6 +3,8 @@ using Riftbourne.Grid;
 using Riftbourne.Skills;
 using Riftbourne.Combat;
 using Riftbourne.UI;
+using Riftbourne.Core;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -48,6 +50,16 @@ namespace Riftbourne.Characters
         [SerializeField] private string unitName = "Unit";
         [SerializeField] private bool isPlayerControlled = true;
         
+        [Header("Faction Assignment")]
+        [Tooltip("Option 1: Use ScriptableObject faction (recommended for custom factions)")]
+        [SerializeField] private FactionData factionData;
+        
+        [Tooltip("Option 2: Use enum faction (for backward compatibility or simple cases)")]
+        [SerializeField] private Faction faction = Faction.Player;
+        
+        [Header("Unit Type")]
+        [SerializeField] private UnitType unitType = UnitType.Soldier;
+        
         [Header("Progression")]
         [SerializeField] private int level = 1;
         [SerializeField] private int currentXP = 0;
@@ -55,11 +67,8 @@ namespace Riftbourne.Characters
         [SerializeField] private int totalActions = 0;  // Track total successful actions
         
         // SP progression tracking
-        private int actionsPerSP = 5;  // Award 1 SP per 5 actions (configurable)
         private int lastSPAwardedAtAction = 0;  // Track when we last awarded SP
 
-        // Burn status effect tracking
-        private BurnEffect burnEffect = null;
 
         // Equipment system
         private Dictionary<EquipmentSlot, EquipmentItem> equippedItems = new Dictionary<EquipmentSlot, EquipmentItem>();
@@ -68,31 +77,90 @@ namespace Riftbourne.Characters
         private HashSet<Skill> masteredSkills = new HashSet<Skill>();
         private HashSet<PassiveSkill> masteredPassiveSkills = new HashSet<PassiveSkill>();
 
+        // Component classes for separation of concerns
+        private UnitStats unitStats;
+        private UnitCombat unitCombat;
+        private UnitProgression unitProgression;
+        private UnitEquipment unitEquipment;
+        private UnitStatusEffects unitStatusEffects;
+
+        // Events
+        /// <summary>
+        /// Event raised when unit's HP changes (damage or healing).
+        /// Parameters: (currentHP, maxHP)
+        /// </summary>
+        public event Action<int, int> OnHPChanged;
+
         // Public properties
         public List<Skill> KnownSkills => knownSkills;
-        public bool IsBurning => burnEffect != null && !burnEffect.IsExpired;
-        public BurnEffect BurnEffect => burnEffect;
+        public bool IsBurning => unitStatusEffects != null && unitStatusEffects.IsBurning;
+        public StatusEffect BurnEffect => unitStatusEffects?.BurnEffect;
         public int MaxHP => CalculateMaxHP();
-        public int CurrentHP => currentHP;
-        public int AttackPower => attackPower + GetTotalEquipmentBonus("Attack"); // Legacy + equipment
-        public int DefensePower => defensePower + GetTotalEquipmentBonus("Defense"); // Legacy + equipment
+        public int CurrentHP => unitCombat != null ? unitCombat.CurrentHP : currentHP;
+        public int AttackPower => unitCombat != null ? unitCombat.GetAttackPower(unitEquipment.GetTotalEquipmentBonus(StatType.Attack) + unitEquipment.GetTotalPassiveSkillBonus(StatType.Attack)) : (attackPower + unitEquipment.GetTotalEquipmentBonus(StatType.Attack) + unitEquipment.GetTotalPassiveSkillBonus(StatType.Attack));
+        public int DefensePower => unitCombat != null ? unitCombat.GetDefensePower(unitEquipment.GetTotalEquipmentBonus(StatType.Defense) + unitEquipment.GetTotalPassiveSkillBonus(StatType.Defense)) : (defensePower + unitEquipment.GetTotalEquipmentBonus(StatType.Defense) + unitEquipment.GetTotalPassiveSkillBonus(StatType.Defense));
         
         // Core Attributes (include equipment bonuses + passive skill bonuses)
-        public int Strength => strength + GetTotalEquipmentBonus("Strength") + GetTotalPassiveSkillBonus("Strength");
-        public int Finesse => finesse + GetTotalEquipmentBonus("Finesse") + GetTotalPassiveSkillBonus("Finesse");
-        public int Focus => focus + GetTotalEquipmentBonus("Focus") + GetTotalPassiveSkillBonus("Focus");
-        public int Speed => speed + GetTotalEquipmentBonus("Speed") + GetTotalPassiveSkillBonus("Speed");  // Replaces Initiative for turn order
-        public int Luck => luck + GetTotalEquipmentBonus("Luck") + GetTotalPassiveSkillBonus("Luck");
+        public int Strength => (unitStats != null ? unitStats.BaseStrength : strength) + unitEquipment.GetTotalEquipmentBonus(StatType.Strength) + unitEquipment.GetTotalPassiveSkillBonus(StatType.Strength);
+        public int Finesse => (unitStats != null ? unitStats.BaseFinesse : finesse) + unitEquipment.GetTotalEquipmentBonus(StatType.Finesse) + unitEquipment.GetTotalPassiveSkillBonus(StatType.Finesse);
+        public int Focus => (unitStats != null ? unitStats.BaseFocus : focus) + unitEquipment.GetTotalEquipmentBonus(StatType.Focus) + unitEquipment.GetTotalPassiveSkillBonus(StatType.Focus);
+        public int Speed => (unitStats != null ? unitStats.BaseSpeed : speed) + unitEquipment.GetTotalEquipmentBonus(StatType.Speed) + unitEquipment.GetTotalPassiveSkillBonus(StatType.Speed);
+        public int Luck => (unitStats != null ? unitStats.BaseLuck : luck) + unitEquipment.GetTotalEquipmentBonus(StatType.Luck) + unitEquipment.GetTotalPassiveSkillBonus(StatType.Luck);
+        
+        // Movement Range (includes passive skill bonuses)
+        public new int MovementRange => base.MovementRange + (unitEquipment?.GetTotalMovementRangeBonus() ?? 0);
         
         public string UnitName => unitName;
         public bool IsPlayerControlled => isPlayerControlled;
-        public bool IsAlive => currentHP > 0;
+        
+        /// <summary>
+        /// Get the faction enum. If using ScriptableObject faction, returns the mapped enum.
+        /// Falls back to enum field if ScriptableObject not assigned or not mapped.
+        /// </summary>
+        public Faction Faction 
+        { 
+            get 
+            {
+                // If using ScriptableObject faction, try to map it to enum
+                if (factionData != null)
+                {
+                    FactionRegistry registry = Resources.Load<FactionRegistry>("FactionRegistry");
+                    if (registry != null)
+                    {
+                        registry.BuildLookup(); // Ensure lookup is built
+                        Faction? mappedEnum = registry.GetEnumForFactionData(factionData);
+                        if (mappedEnum.HasValue)
+                        {
+                            return mappedEnum.Value;
+                        }
+                    }
+                    
+                    // If registry not found or not mapped, check IsPlayerFaction flag as fallback
+                    if (factionData.IsPlayerFaction)
+                    {
+                        return Faction.Player;
+                    }
+                    
+                    // If not mapped and not player, return the enum field (should be set correctly)
+                    Debug.LogWarning($"Unit {unitName}: FactionData '{factionData.FactionName}' is not mapped to an enum in FactionRegistry. Using fallback enum value.");
+                }
+                return faction;
+            }
+        }
+        
+        /// <summary>
+        /// Get the ScriptableObject faction data (if assigned).
+        /// </summary>
+        public FactionData FactionData => factionData;
+        
+        public UnitType UnitType => unitType;
+        public bool IsAlive => unitCombat != null ? unitCombat.IsAlive : (currentHP > 0);
         
         // Progression
-        public int Level => level;
-        public int CurrentXP => currentXP;
-        public int SkillPoints => skillPoints;
-        public int TotalActions => totalActions;
+        public int Level => unitProgression != null ? unitProgression.Level : level;
+        public int CurrentXP => unitProgression != null ? unitProgression.CurrentXP : currentXP;
+        public int SkillPoints => unitProgression != null ? unitProgression.SkillPoints : skillPoints;
+        public int TotalActions => unitProgression != null ? unitProgression.TotalActions : totalActions;
 
         // Action tracking for turn-based gameplay
         public int MovementPointsRemaining { get; private set; }
@@ -106,27 +174,93 @@ namespace Riftbourne.Characters
         {
             currentHP = maxHP;
             
+            // Sync faction with isPlayerControlled for backward compatibility
+            // Priority: ScriptableObject faction > enum faction > isPlayerControlled
+            if (factionData != null)
+            {
+                // Using ScriptableObject faction - sync isPlayerControlled if needed
+                if (factionData.IsPlayerFaction && !isPlayerControlled)
+                {
+                    isPlayerControlled = true;
+                }
+                else if (!factionData.IsPlayerFaction && isPlayerControlled)
+                {
+                    isPlayerControlled = false;
+                }
+            }
+            else
+            {
+                // Using enum faction - sync with isPlayerControlled
+                if (isPlayerControlled && faction != Faction.Player)
+                {
+                    faction = Faction.Player;
+                }
+                else if (!isPlayerControlled && faction == Faction.Player)
+                {
+                    // If not player controlled but faction is Player, set to default enemy faction
+                    faction = Faction.Faction1;
+                }
+            }
+            
             // Initialize manager references if not already set by base class
             // (Base class Character.Awake() should have already set these, but ensure they're set)
             if (gridManager == null)
-                gridManager = FindFirstObjectByType<GridManager>();
+            {
+                gridManager = ManagerRegistry.Get<GridManager>();
+                // Fallback to Instance if ManagerRegistry isn't ready yet
+                if (gridManager == null)
+                {
+                    gridManager = GridManager.Instance;
+                }
+            }
             if (hazardManager == null)
-                hazardManager = FindFirstObjectByType<HazardManager>();
+            {
+                hazardManager = ManagerRegistry.Get<HazardManager>();
+                if (hazardManager == null)
+                {
+                    hazardManager = FindFirstObjectByType<HazardManager>();
+                }
+            }
+            
+            // Initialize grid position EARLY - before other systems try to use it
+            // This must happen in Awake() so it's ready before Start() methods run
+            InitializeGridPosition();
             
             // Initialize movement points
             MovementPointsRemaining = MovementRange;
+
+            // Initialize component classes
+            unitStats = new UnitStats(strength, finesse, focus, speed, luck);
+            unitCombat = new UnitCombat(this, maxHP, attackPower, defensePower);
+            unitProgression = new UnitProgression(this, level, currentXP, skillPoints, masteredSkills, masteredPassiveSkills);
+            unitEquipment = new UnitEquipment(this, masteredSkills, masteredPassiveSkills, knownSkills);
+            unitStatusEffects = new UnitStatusEffects(this);
         }
-
-
-        private void Start()
+        
+        /// <summary>
+        /// Initialize grid position from world position.
+        /// Called in Awake() to ensure gridX/gridY are set before other systems query them.
+        /// </summary>
+        private void InitializeGridPosition()
         {
-            // Use cached gridManager reference
+            if (gridManager == null)
+            {
+                Debug.LogWarning($"{unitName} - GridManager not available in Awake(), will retry in Start()");
+                return;
+            }
             
-            // Initialize grid position based on world position
-            int startX = Mathf.FloorToInt(transform.position.x);
-            int startY = Mathf.FloorToInt(transform.position.z);
+            // Calculate grid coordinates from world position
+            // Grid cells are centered at (0.5, 1.5, 2.5, etc.) for cellSize = 1
+            float cellSize = gridManager.CellSize;
+            
+            // Calculate which cell this unit is in
+            // If cellSize=1, cell centers are at 0.5, 1.5, 2.5...
+            // So a unit at world pos (1.5, 0, 1.5) should be in cell (1, 1)
+            // Formula: gridX = floor(worldX / cellSize)
+            int startX = Mathf.FloorToInt(transform.position.x / cellSize);
+            int startY = Mathf.FloorToInt(transform.position.z / cellSize);
 
-            if (gridManager != null && gridManager.IsValidGridPosition(startX, startY))
+            if (gridManager.IsValidGridPosition(startX, startY))
             {
                 // Get the proper centered world position from the grid cell
                 GridCell cell = gridManager.GetCell(startX, startY);
@@ -135,15 +269,107 @@ namespace Riftbourne.Characters
                     Vector3 centeredPosition = cell.WorldPosition;
                     centeredPosition.y = 0.5f; // Keep unit elevated
                     
+                    // Set grid position immediately - this updates gridX and gridY
                     SetGridPosition(startX, startY, centeredPosition);
                     transform.position = centeredPosition; // Snap to cell center
                     
                     Debug.Log($"{unitName} initialized at grid position ({startX}, {startY}) - world pos: {centeredPosition}");
                 }
+                else
+                {
+                    Debug.LogError($"{unitName} - GridManager returned null cell for ({startX}, {startY}). Grid position NOT initialized!");
+                }
             }
             else
             {
-                Debug.LogWarning($"{unitName} spawned at invalid grid position!");
+                Debug.LogError($"{unitName} spawned at invalid grid position! World pos: {transform.position}, Calculated grid: ({startX}, {startY}), cellSize: {cellSize}. Grid position NOT initialized!");
+            }
+        }
+
+
+        private void Start()
+        {
+            // Grid position should already be initialized in Awake(), but double-check
+            // This is a fallback in case GridManager wasn't available in Awake()
+            // First, retry getting GridManager if it's still null
+            if (gridManager == null)
+            {
+                gridManager = ManagerRegistry.Get<GridManager>();
+                if (gridManager == null)
+                {
+                    // Try Instance property
+                    gridManager = GridManager.Instance;
+                }
+                if (gridManager == null)
+                {
+                    // Last resort: try FindObjectOfType (slower but works if registry hasn't initialized)
+                    gridManager = FindFirstObjectByType<GridManager>();
+                    if (gridManager != null)
+                    {
+                        Debug.LogWarning($"{unitName} - GridManager found via FindObjectOfType in Start() (ManagerRegistry not ready)");
+                    }
+                    else
+                    {
+                        Debug.LogError($"{unitName} - GridManager still not available in Start()! Grid position cannot be initialized.");
+                        return;
+                    }
+                }
+                else
+                {
+                    Debug.Log($"{unitName} - GridManager now available in Start(), initializing grid position");
+                }
+            }
+            
+            // Now check if grid position needs initialization
+            // Calculate what the grid position SHOULD be from current world position
+            float cellSize = gridManager.CellSize;
+            int expectedX = Mathf.FloorToInt(transform.position.x / cellSize);
+            int expectedY = Mathf.FloorToInt(transform.position.z / cellSize);
+            
+            // Check if grid position is valid and matches world position
+            bool needsInitialization = false;
+            
+            // First check: Is the grid position valid?
+            if (!gridManager.IsValidGridPosition(GridX, GridY))
+            {
+                needsInitialization = true;
+                Debug.LogWarning($"{unitName} - Grid position ({GridX}, {GridY}) is invalid, reinitializing in Start()");
+            }
+            // Second check: Does grid position match where we actually are in the world?
+            else if (GridX != expectedX || GridY != expectedY)
+            {
+                needsInitialization = true;
+                Debug.LogWarning($"{unitName} - Grid position ({GridX}, {GridY}) doesn't match world position (expected {expectedX}, {expectedY}), reinitializing in Start()");
+            }
+            // Third check: Does the grid cell exist and is the unit positioned at the cell center?
+            else
+            {
+                GridCell cell = gridManager.GetCell(GridX, GridY);
+                if (cell == null)
+                {
+                    needsInitialization = true;
+                    Debug.LogWarning($"{unitName} - Grid cell at ({GridX}, {GridY}) is null, reinitializing in Start()");
+                }
+                else
+                {
+                    // Check if unit is actually at the cell center (within tolerance)
+                    Vector3 expectedWorldPos = cell.WorldPosition;
+                    float distanceFromCenter = Vector3.Distance(
+                        new Vector3(transform.position.x, 0, transform.position.z),
+                        new Vector3(expectedWorldPos.x, 0, expectedWorldPos.z)
+                    );
+                    if (distanceFromCenter > 0.1f) // Not at cell center
+                    {
+                        needsInitialization = true;
+                        Debug.LogWarning($"{unitName} - Unit at world {transform.position} is not at cell center {expectedWorldPos}, reinitializing in Start()");
+                    }
+                }
+            }
+            
+            // Always initialize if we haven't done so yet, or if validation failed
+            if (needsInitialization)
+            {
+                InitializeGridPosition();
             }
 
             // HP Display updates itself automatically in its Update() method
@@ -156,16 +382,63 @@ namespace Riftbourne.Characters
             if (accessory2 != null) EquipItem(accessory2, EquipmentSlot.Accessory2);
             if (codex != null) EquipItem(codex, EquipmentSlot.Codex);
 
-            // Register with TurnManager if it exists (for late-spawning units)
-            TurnManager turnManager = FindFirstObjectByType<TurnManager>();
+            // Register with managers
+            RegisterWithManagers();
+        }
+
+        private void OnEnable()
+        {
+            RegisterWithManagers();
+        }
+
+        private void OnDisable()
+        {
+            UnregisterFromManagers();
+        }
+
+        private void RegisterWithManagers()
+        {
+            // Register with TurnManager
+            TurnManager turnManager = ManagerRegistry.Get<TurnManager>();
             if (turnManager != null)
             {
                 turnManager.RegisterUnit(this);
             }
+
+            // Register with PartyManager if player-controlled
+            if (isPlayerControlled)
+            {
+                PartyManager partyManager = PartyManager.Instance;
+                if (partyManager != null)
+                {
+                    partyManager.RegisterUnit(this);
+                }
+            }
+        }
+
+        private void UnregisterFromManagers()
+        {
+            // Unregister from TurnManager
+            TurnManager turnManager = ManagerRegistry.Get<TurnManager>();
+            if (turnManager != null)
+            {
+                turnManager.UnregisterUnit(this);
+            }
+
+            // Unregister from PartyManager if player-controlled
+            if (isPlayerControlled)
+            {
+                PartyManager partyManager = PartyManager.Instance;
+                if (partyManager != null)
+                {
+                    partyManager.UnregisterUnit(this);
+                }
+            }
         }
 
         /// <summary>
-        /// Called at the start of this unit's turn to apply burn damage.
+        /// Called at the start of this unit's turn to apply hazard damage and status effects.
+        /// NOTE: This is called for ALL units (both player and enemy/AI units) when their turn starts.
         /// </summary>
         public void OnTurnStart()
         {
@@ -177,44 +450,85 @@ namespace Riftbourne.Characters
 
             // Apply hazard damage if standing on hazard at turn start
             // Use cached manager references
-            if (gridManager != null && hazardManager != null)
+            if (gridManager == null)
             {
+                Debug.LogWarning($"[TURN START] {unitName} - GridManager is null, cannot check for hazards");
+            }
+            else if (hazardManager == null)
+            {
+                Debug.LogWarning($"[TURN START] {unitName} - HazardManager is null, cannot check for hazards");
+            }
+            else
+            {
+                Debug.Log($"[TURN START] {unitName} checking for hazards at ({GridX}, {GridY})");
                 GridCell currentCell = gridManager.GetCell(GridX, GridY);
-                if (currentCell != null && currentCell.Hazard != null)
+                if (currentCell == null)
                 {
-                    Debug.Log($"[TURN START] {unitName} standing on {currentCell.Hazard.Type} hazard");
+                    Debug.LogWarning($"[TURN START] {unitName} - Cell at ({GridX}, {GridY}) is null!");
+                }
+                else if (currentCell.Hazard == null)
+                {
+                    Debug.Log($"[TURN START] {unitName} at ({GridX}, {GridY}) - no hazard on cell");
+                }
+                else
+                {
+                    Debug.Log($"[TURN START] {unitName} standing on {currentCell.Hazard.Type} hazard at ({GridX}, {GridY})");
                     hazardManager.ApplyHazardDamageToUnit(this, currentCell);
                 }
             }
 
-            // Apply burn damage if burning
-            if (IsBurning)
-            {
-                burnEffect.ApplyBurnDamage();
-
-                // HP Display updates itself automatically
-
-                // Clean up expired burn
-                if (burnEffect.IsExpired)
-                {
-                    burnEffect = null;
-                }
-            }
+            // Apply status effect damage (burn, poison, etc.)
+            unitStatusEffects?.ApplyStatusEffectDamage();
         }
 
         /// <summary>
         /// Take damage from an attack. Returns actual damage dealt.
         /// </summary>
-        public int TakeDamage(int incomingAttack)
+        /// <param name="incomingAttack">The attack power/damage value</param>
+        /// <param name="damageSource">Optional source of the damage (e.g., "Burn", "Poison", "Attack") for logging</param>
+        public int TakeDamage(int incomingAttack, string damageSource = null)
         {
-            // Calculate damage: (Attack - Defense), minimum 1
-            // Use DefensePower property to include equipment bonuses
-            int damage = Mathf.Max(1, incomingAttack - DefensePower);
+            int damage = unitCombat.TakeDamage(incomingAttack, DefensePower);
+            currentHP = unitCombat.CurrentHP;
 
-            currentHP -= damage;
-            currentHP = Mathf.Max(0, currentHP); // Don't go below 0
+            if (!string.IsNullOrEmpty(damageSource))
+            {
+                Debug.Log($"{unitName} took {damage} {damageSource} damage! HP: {currentHP}/{MaxHP}");
+            }
+            else
+            {
+                Debug.Log($"{unitName} took {damage} damage! HP: {currentHP}/{MaxHP}");
+            }
 
-            Debug.Log($"{unitName} took {damage} damage! HP: {currentHP}/{maxHP}");
+            // Raise HP changed events (both local and global)
+            OnHPChanged?.Invoke(currentHP, MaxHP);
+            GameEvents.RaiseUnitHPChanged(this, currentHP, MaxHP);
+
+            if (!IsAlive)
+            {
+                OnDeath();
+            }
+
+            return damage;
+        }
+
+        /// <summary>
+        /// Take damage that bypasses defense (for environmental hazards, poison, etc.)
+        /// Returns actual damage dealt.
+        /// </summary>
+        public int TakeDamageBypassDefense(int incomingDamage)
+        {
+            int minDamage = GameConstants.Instance != null ? GameConstants.Instance.MinimumDamage : 1;
+            int damage = Mathf.Max(minDamage, incomingDamage);
+            
+            unitCombat.SetHP(unitCombat.CurrentHP - damage, MaxHP);
+            currentHP = unitCombat.CurrentHP;
+
+            Debug.Log($"{unitName} took {damage} damage (bypassing defense)! HP: {currentHP}/{MaxHP}");
+
+            // Raise HP changed events (both local and global)
+            OnHPChanged?.Invoke(currentHP, MaxHP);
+            GameEvents.RaiseUnitHPChanged(this, currentHP, MaxHP);
 
             if (!IsAlive)
             {
@@ -229,10 +543,14 @@ namespace Riftbourne.Characters
         /// </summary>
         public void Heal(int amount)
         {
-            currentHP += amount;
-            currentHP = Mathf.Min(currentHP, maxHP); // Don't exceed max
+            unitCombat.Heal(amount, MaxHP);
+            currentHP = unitCombat.CurrentHP;
 
-            Debug.Log($"{unitName} healed for {amount}! HP: {currentHP}/{maxHP}");
+            Debug.Log($"{unitName} healed for {amount}! HP: {currentHP}/{MaxHP}");
+
+            // Raise HP changed events (both local and global)
+            OnHPChanged?.Invoke(currentHP, MaxHP);
+            GameEvents.RaiseUnitHPChanged(this, currentHP, MaxHP);
         }
 
         /// <summary>
@@ -241,6 +559,7 @@ namespace Riftbourne.Characters
         private void OnDeath()
         {
             Debug.Log($"{unitName} has been defeated!");
+            GameEvents.RaiseUnitDied(this);
             // Future: Play death animation, drop loot, etc.
         }
 
@@ -360,25 +679,32 @@ namespace Riftbourne.Characters
             Unit occupant = cell.OccupyingUnit;
             if (occupant == null || occupant == this) return false;
             
-            // Enemy blocks path (different team)
-            return occupant.IsPlayerControlled != this.IsPlayerControlled;
+            // Enemy blocks path (hostile faction)
+            FactionRelationship factionRel = FactionRelationship.Instance ?? FindFirstObjectByType<FactionRelationship>();
+            if (factionRel != null)
+            {
+                return factionRel.AreHostile(this.Faction, occupant.Faction);
+            }
+            
+            // Fallback: different faction = enemy
+            return occupant.Faction != this.Faction;
+        }
+
+        /// <summary>
+        /// Apply a status effect to this unit using StatusEffectData.
+        /// </summary>
+        public void ApplyStatusEffect(Combat.StatusEffectData effectData, int duration)
+        {
+            unitStatusEffects?.ApplyStatusEffect(effectData, duration);
         }
 
         /// <summary>
         /// Apply a burn effect to this unit.
+        /// Legacy method for backward compatibility.
         /// </summary>
         public void ApplyBurn(int damagePerTurn, int duration)
         {
-            if (burnEffect != null && !burnEffect.IsExpired)
-            {
-                // Refresh existing burn
-                burnEffect.Refresh(duration);
-            }
-            else
-            {
-                // Create new burn effect
-                burnEffect = new BurnEffect(this, damagePerTurn, duration);
-            }
+            unitStatusEffects?.ApplyBurn(damagePerTurn, duration);
         }
 
         /// <summary>
@@ -409,26 +735,7 @@ namespace Riftbourne.Characters
         /// </summary>
         public bool EquipItem(EquipmentItem item, EquipmentSlot targetSlot)
         {
-            if (item == null) return false;
-            
-            // Check if item can be equipped in this slot
-            if (!item.CanEquipInSlot(targetSlot))
-            {
-                Debug.LogWarning($"{item.ItemName} cannot be equipped in {targetSlot} slot!");
-                return false;
-            }
-
-            // Unequip whatever is in that slot currently
-            if (equippedItems.ContainsKey(targetSlot))
-            {
-                UnequipItem(targetSlot);
-            }
-
-            // Equip the new item
-            equippedItems[targetSlot] = item;
-
-            Debug.Log($"{unitName} equipped {item.ItemName} in {targetSlot} slot.");
-            return true;
+            return unitEquipment?.EquipItem(item, targetSlot) ?? false;
         }
         
         /// <summary>
@@ -437,15 +744,7 @@ namespace Riftbourne.Characters
         /// </summary>
         public bool EquipItem(EquipmentItem item)
         {
-            if (item == null || item.CompatibleSlots == null || item.CompatibleSlots.Count == 0)
-            {
-                Debug.LogWarning($"Cannot equip {item?.ItemName} - no compatible slots defined!");
-                return false;
-            }
-            
-            // Try to equip in first compatible slot
-            EquipmentSlot firstSlot = item.CompatibleSlots[0];
-            return EquipItem(item, firstSlot);
+            return unitEquipment?.EquipItem(item) ?? false;
         }
 
         /// <summary>
@@ -453,13 +752,7 @@ namespace Riftbourne.Characters
         /// </summary>
         public bool UnequipItem(EquipmentSlot slot)
         {
-            if (!equippedItems.ContainsKey(slot)) return false;
-
-            EquipmentItem item = equippedItems[slot];
-            equippedItems.Remove(slot);
-
-            Debug.Log($"{unitName} unequipped {item.ItemName} from {slot} slot.");
-            return true;
+            return unitEquipment?.UnequipItem(slot) ?? false;
         }
 
         /// <summary>
@@ -467,7 +760,7 @@ namespace Riftbourne.Characters
         /// </summary>
         public EquipmentItem GetEquippedItem(EquipmentSlot slot)
         {
-            return equippedItems.ContainsKey(slot) ? equippedItems[slot] : null;
+            return unitEquipment?.GetEquippedItem(slot);
         }
 
         /// <summary>
@@ -476,23 +769,7 @@ namespace Riftbourne.Characters
         /// </summary>
         public bool CanUseSkill(Skill skill)
         {
-            if (skill == null) return false;
-
-            // Check if skill is in known skills (backwards compatibility)
-            if (knownSkills.Contains(skill)) return true;
-
-            // Check if skill is mastered (SP-based system)
-            if (masteredSkills.Contains(skill))
-                return true;
-
-            // Check if any equipped item grants this skill
-            foreach (var equipped in equippedItems.Values)
-            {
-                if (equipped.GrantedSkills != null && equipped.GrantedSkills.Contains(skill))
-                    return true;
-            }
-
-            return false;
+            return unitEquipment?.CanUseSkill(skill) ?? false;
         }
 
         /// <summary>
@@ -500,106 +777,36 @@ namespace Riftbourne.Characters
         /// </summary>
         public List<Skill> GetAvailableSkills()
         {
-            List<Skill> available = new List<Skill>();
-
-            // Add known skills (backwards compatibility)
-            available.AddRange(knownSkills);
-
-            // Add mastered skills
-            foreach (Skill skill in masteredSkills)
-            {
-                if (!available.Contains(skill))
-                    available.Add(skill);
-            }
-
-            // Add skills from equipped items
-            foreach (var item in equippedItems.Values)
-            {
-                if (item.TeachesSkills)
-                {
-                    foreach (Skill skill in item.GrantedSkills)
-                    {
-                        if (!available.Contains(skill))
-                            available.Add(skill);
-                    }
-                }
-            }
-
-            return available;
+            return unitEquipment?.GetAvailableSkills() ?? new List<Skill>();
         }
         
         /// <summary>
         /// Calculate MaxHP including base value, equipment bonuses, and passive skill bonuses.
-        /// Percentage bonuses scale with base maxHP.
+        /// Flat bonuses are added first, then percentage bonuses scale the total.
         /// </summary>
         private int CalculateMaxHP()
         {
+            if (unitEquipment != null && unitCombat != null)
+            {
+                int flatBonus = unitEquipment.GetTotalMaxHPBonusFlat();
+                float percentBonus = unitEquipment.GetTotalMaxHPBonusPercent();
+                unitCombat.RecalculateMaxHP(maxHP, flatBonus, percentBonus);
+                return unitCombat.MaxHP;
+            }
+            
+            // Fallback calculation
             int baseHP = maxHP;
-            float percentBonus = 0f;
+            int fallbackFlatBonus = 0;
+            float fallbackPercentBonus = 0f;
             
-            // Sum percentage bonuses from all equipment
-            foreach (var item in equippedItems.Values)
+            if (unitEquipment != null)
             {
-                percentBonus += item.MaxHPBonusPercent;
+                fallbackFlatBonus = unitEquipment.GetTotalMaxHPBonusFlat();
+                fallbackPercentBonus = unitEquipment.GetTotalMaxHPBonusPercent();
             }
             
-            // Sum percentage bonuses from mastered passive skills
-            foreach (var passive in masteredPassiveSkills)
-            {
-                percentBonus += passive.MaxHPBonusPercent;
-            }
-            
-            // Apply percentage bonus (e.g., 10% = 0.10)
-            float totalHP = baseHP * (1f + (percentBonus / 100f));
+            float totalHP = (baseHP + fallbackFlatBonus) * (1f + (fallbackPercentBonus / 100f));
             return Mathf.RoundToInt(totalHP);
-        }
-        
-        /// <summary>
-        /// Get total flat bonus for a specific stat from all equipped items.
-        /// </summary>
-        private int GetTotalEquipmentBonus(string statName)
-        {
-            int totalBonus = 0;
-            
-            foreach (var item in equippedItems.Values)
-            {
-                switch (statName)
-                {
-                    case "Attack": totalBonus += item.AttackBonus; break;
-                    case "Defense": totalBonus += item.DefenseBonus; break;
-                    case "Strength": totalBonus += item.StrengthBonus; break;
-                    case "Finesse": totalBonus += item.FinesseBonus; break;
-                    case "Focus": totalBonus += item.FocusBonus; break;
-                    case "Speed": totalBonus += item.SpeedBonus; break;
-                    case "Luck": totalBonus += item.LuckBonus; break;
-                }
-            }
-            
-            return totalBonus;
-        }
-        
-        /// <summary>
-        /// Get total flat bonus for a specific stat from all mastered passive skills.
-        /// </summary>
-        private int GetTotalPassiveSkillBonus(string statName)
-        {
-            int totalBonus = 0;
-            
-            foreach (var passive in masteredPassiveSkills)
-            {
-                switch (statName)
-                {
-                    case "Attack": totalBonus += passive.AttackBonus; break;
-                    case "Defense": totalBonus += passive.DefenseBonus; break;
-                    case "Strength": totalBonus += passive.StrengthBonus; break;
-                    case "Finesse": totalBonus += passive.FinesseBonus; break;
-                    case "Focus": totalBonus += passive.FocusBonus; break;
-                    case "Speed": totalBonus += passive.SpeedBonus; break;
-                    case "Luck": totalBonus += passive.LuckBonus; break;
-                }
-            }
-            
-            return totalBonus;
         }
 
         #endregion
@@ -624,8 +831,28 @@ namespace Riftbourne.Characters
             }
 
             MovementPointsRemaining -= points;
+            // Ensure it doesn't go below 0
+            MovementPointsRemaining = Mathf.Max(0, MovementPointsRemaining);
             Debug.Log($"{unitName} moved {points} cells - {MovementPointsRemaining}/{MaxMovementPoints} movement remaining");
             return true;
+        }
+
+        /// <summary>
+        /// Force-spend movement points (used when movement completes to prevent infinite movement bug).
+        /// This bypasses normal checks and always deducts points, even if the unit has acted.
+        /// </summary>
+        public void ForceSpendMovementPoints(int points)
+        {
+            if (points <= 0)
+            {
+                Debug.LogWarning($"{unitName} ForceSpendMovementPoints called with invalid points: {points}");
+                return;
+            }
+
+            // Always spend points, even if it would normally be blocked
+            // This prevents the infinite movement bug when movement completes after hazard damage
+            MovementPointsRemaining = Mathf.Max(0, MovementPointsRemaining - points);
+            Debug.Log($"{unitName} force-spent {points} movement points - {MovementPointsRemaining}/{MaxMovementPoints} remaining");
         }
 
         /// <summary>
@@ -675,7 +902,7 @@ namespace Riftbourne.Characters
         /// </summary>
         public int GetXPRequiredForLevel(int targetLevel)
         {
-            return Mathf.RoundToInt(100 * Mathf.Pow(1.5f, targetLevel - 2));
+            return unitProgression?.GetXPRequiredForLevel(targetLevel) ?? Mathf.RoundToInt(100 * Mathf.Pow(1.5f, targetLevel - 2));
         }
         
         /// <summary>
@@ -683,7 +910,7 @@ namespace Riftbourne.Characters
         /// </summary>
         public int GetXPRequiredForNextLevel()
         {
-            return GetXPRequiredForLevel(level + 1);
+            return unitProgression?.GetXPRequiredForNextLevel() ?? GetXPRequiredForLevel(level + 1);
         }
         
         /// <summary>
@@ -691,45 +918,28 @@ namespace Riftbourne.Characters
         /// </summary>
         public void AwardXP(int amount)
         {
-            if (amount <= 0) return;
-            
-            currentXP += amount;
-            Debug.Log($"{unitName} gained {amount} XP! ({currentXP}/{GetXPRequiredForNextLevel()})");
-            
-            // Check for level up
-            while (currentXP >= GetXPRequiredForNextLevel())
+            if (unitProgression != null)
             {
-                LevelUp();
+                unitProgression.AwardXP(amount, (newLevel) => {
+                    level = newLevel;
+                    // Random stat increases on level up
+                    int statsToAllocate = GameConstants.Instance != null ? GameConstants.Instance.StatsPerLevel : 2;
+                    for (int i = 0; i < statsToAllocate; i++)
+                    {
+                        int randomStat = UnityEngine.Random.Range(0, 5);
+                        switch (randomStat)
+                        {
+                            case 0: unitStats?.IncreaseStrength(1); strength++; Debug.Log($"{unitName} Strength +1"); break;
+                            case 1: unitStats?.IncreaseFinesse(1); finesse++; Debug.Log($"{unitName} Finesse +1"); break;
+                            case 2: unitStats?.IncreaseFocus(1); focus++; Debug.Log($"{unitName} Focus +1"); break;
+                            case 3: unitStats?.IncreaseSpeed(1); speed++; Debug.Log($"{unitName} Speed +1"); break;
+                            case 4: unitStats?.IncreaseLuck(1); luck++; Debug.Log($"{unitName} Luck +1"); break;
+                        }
+                    }
+                });
+                currentXP = unitProgression.CurrentXP;
+                level = unitProgression.Level;
             }
-        }
-        
-        /// <summary>
-        /// Level up this unit - grants stat increases.
-        /// SP is now awarded via actions, not leveling.
-        /// </summary>
-        private void LevelUp()
-        {
-            int xpNeeded = GetXPRequiredForNextLevel();
-            currentXP -= xpNeeded;
-            level++;
-            
-            // Random stat increases (PLACEHOLDER - should be player-chosen eventually)
-            // TODO: Replace with player stat allocation system
-            int statsToAllocate = 2;
-            for (int i = 0; i < statsToAllocate; i++)
-            {
-                int randomStat = UnityEngine.Random.Range(0, 5);
-                switch (randomStat)
-                {
-                    case 0: strength++; Debug.Log($"{unitName} Strength +1"); break;
-                    case 1: finesse++; Debug.Log($"{unitName} Finesse +1"); break;
-                    case 2: focus++; Debug.Log($"{unitName} Focus +1"); break;
-                    case 3: speed++; Debug.Log($"{unitName} Speed +1"); break;
-                    case 4: luck++; Debug.Log($"{unitName} Luck +1"); break;
-                }
-            }
-            
-            Debug.Log($"🎉 {unitName} reached Level {level}! +2 random stats");
         }
         
         /// <summary>
@@ -738,17 +948,9 @@ namespace Riftbourne.Characters
         /// </summary>
         public void RecordAction()
         {
-            totalActions++;
-            
-            // Check if we should award SP (every 5 actions)
-            int spToAward = (totalActions - lastSPAwardedAtAction) / actionsPerSP;
-            
-            if (spToAward > 0)
-            {
-                skillPoints += spToAward;
-                lastSPAwardedAtAction += spToAward * actionsPerSP;
-                Debug.Log($"⭐ {unitName} earned {spToAward} SP! ({totalActions} total actions, {skillPoints} SP total)");
-            }
+            unitProgression?.RecordAction();
+            totalActions = unitProgression?.TotalActions ?? totalActions;
+            skillPoints = unitProgression?.SkillPoints ?? skillPoints;
         }
         
         /// <summary>
@@ -757,24 +959,9 @@ namespace Riftbourne.Characters
         /// </summary>
         public bool MasterSkill(Skill skill)
         {
-            if (skill == null) return false;
-            
-            if (masteredSkills.Contains(skill))
-            {
-                Debug.Log($"{unitName} already mastered {skill.SkillName}!");
-                return false;
-            }
-            
-            if (skillPoints < skill.MasteryCost)
-            {
-                Debug.Log($"{unitName} needs {skill.MasteryCost} SP to master {skill.SkillName}, but only has {skillPoints} SP");
-                return false;
-            }
-            
-            skillPoints -= skill.MasteryCost;
-            masteredSkills.Add(skill);
-            Debug.Log($"✨ {unitName} mastered {skill.SkillName} for {skill.MasteryCost} SP! ({skillPoints} SP remaining)");
-            return true;
+            bool result = unitProgression?.MasterSkill(skill) ?? false;
+            skillPoints = unitProgression?.SkillPoints ?? skillPoints;
+            return result;
         }
         
         /// <summary>
@@ -782,7 +969,7 @@ namespace Riftbourne.Characters
         /// </summary>
         public bool IsSkillMastered(Skill skill)
         {
-            return masteredSkills.Contains(skill);
+            return unitProgression?.IsSkillMastered(skill) ?? false;
         }
         
         /// <summary>
@@ -791,32 +978,9 @@ namespace Riftbourne.Characters
         /// </summary>
         public bool MasterPassiveSkill(PassiveSkill passiveSkill)
         {
-            if (passiveSkill == null) return false;
-            
-            if (masteredPassiveSkills.Contains(passiveSkill))
-            {
-                Debug.Log($"{unitName} already mastered {passiveSkill.SkillName}!");
-                return false;
-            }
-            
-            if (skillPoints < passiveSkill.SPCost)
-            {
-                Debug.Log($"{unitName} needs {passiveSkill.SPCost} SP to master {passiveSkill.SkillName}, but only has {skillPoints} SP");
-                return false;
-            }
-            
-            skillPoints -= passiveSkill.SPCost;
-            masteredPassiveSkills.Add(passiveSkill);
-            Debug.Log($"✨ {unitName} mastered passive skill {passiveSkill.SkillName} for {passiveSkill.SPCost} SP! ({skillPoints} SP remaining)");
-            
-            // Recalculate max HP in case it changed
-            int newMaxHP = CalculateMaxHP();
-            if (newMaxHP > currentHP)
-            {
-                currentHP = newMaxHP; // Heal to new max if HP increased
-            }
-            
-            return true;
+            bool result = unitProgression?.MasterPassiveSkill(passiveSkill, CalculateMaxHP, (newHP) => { currentHP = newHP; unitCombat?.SetHP(newHP, MaxHP); }) ?? false;
+            skillPoints = unitProgression?.SkillPoints ?? skillPoints;
+            return result;
         }
         
         /// <summary>
@@ -824,7 +988,7 @@ namespace Riftbourne.Characters
         /// </summary>
         public bool IsPassiveSkillMastered(PassiveSkill passiveSkill)
         {
-            return masteredPassiveSkills.Contains(passiveSkill);
+            return unitProgression?.IsPassiveSkillMastered(passiveSkill) ?? false;
         }
         
         /// <summary>
@@ -832,22 +996,7 @@ namespace Riftbourne.Characters
         /// </summary>
         public List<PassiveSkill> GetAvailablePassiveSkills()
         {
-            List<PassiveSkill> available = new List<PassiveSkill>();
-            
-            // Add passive skills from equipped items
-            foreach (var item in equippedItems.Values)
-            {
-                if (item.GrantedPassiveSkills != null)
-                {
-                    foreach (PassiveSkill passiveSkill in item.GrantedPassiveSkills)
-                    {
-                        if (!available.Contains(passiveSkill))
-                            available.Add(passiveSkill);
-                    }
-                }
-            }
-            
-            return available;
+            return unitEquipment?.GetAvailablePassiveSkills() ?? new List<PassiveSkill>();
         }
         
         #endregion

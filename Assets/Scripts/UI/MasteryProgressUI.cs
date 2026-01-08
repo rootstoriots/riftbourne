@@ -22,6 +22,11 @@ namespace Riftbourne.UI
         private GameObject panel;
         private Text progressText;
 
+        private void Awake()
+        {
+            canvas = FindFirstObjectByType<Canvas>();
+        }
+
         private void Start()
         {
             CreateUI();
@@ -29,8 +34,11 @@ namespace Riftbourne.UI
 
         private void CreateUI()
         {
-            // Find or create main canvas
-            canvas = FindFirstObjectByType<Canvas>();
+            // Use cached canvas or find/create one
+            if (canvas == null)
+            {
+                canvas = FindFirstObjectByType<Canvas>();
+            }
             if (canvas == null)
             {
                 GameObject canvasObj = new GameObject("MasteryCanvas");

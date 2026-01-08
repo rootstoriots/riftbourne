@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Riftbourne.Core;
 
 namespace Riftbourne.Grid
 {
@@ -10,22 +11,40 @@ namespace Riftbourne.Grid
     public class CellHoverHandler : MonoBehaviour
     {
         [Header("Hover Settings")]
-        [SerializeField] private Color hoverColor = new Color(1f, 1f, 1f, 0.3f); // White, semi-transparent
-        [SerializeField] private float hoverHeight = 0.025f; // Slightly above grid lines
+        [SerializeField] private Color hoverColor = new Color(1f, 1f, 1f, 0.6f); // White, more visible
+        [SerializeField] private float hoverHeight = 0.12f; // Well above range highlights (0.02f) so it's clearly visible on top
 
         private GameObject hoverHighlight;
         private GridManager gridManager;
         private GridCell currentHoverCell;
+        private CameraService cameraService;
+
+        private void Awake()
+        {
+            gridManager = ManagerRegistry.Get<GridManager>();
+            cameraService = CameraService.Instance;
+        }
 
         private void Start()
         {
             Debug.Log("CellHoverHandler: Starting...");
-            gridManager = FindFirstObjectByType<GridManager>();
+            
+            // Try to get gridManager if not set
+            if (gridManager == null)
+            {
+                gridManager = ManagerRegistry.Get<GridManager>();
+            }
             
             if (gridManager == null)
             {
                 Debug.LogError("CellHoverHandler: GridManager not found!");
                 return;
+            }
+            
+            // Try to get cameraService if not set
+            if (cameraService == null)
+            {
+                cameraService = CameraService.Instance;
             }
             
             Debug.Log($"CellHoverHandler: GridManager found, creating highlight...");
@@ -40,10 +59,27 @@ namespace Riftbourne.Grid
             hoverHighlight.transform.rotation = Quaternion.Euler(90, 0, 0);
             hoverHighlight.transform.localScale = new Vector3(gridManager.CellSize * 0.95f, gridManager.CellSize * 0.95f, 1);
 
-            // Create semi-transparent material
-            Material hoverMat = new Material(Shader.Find("Sprites/Default"));
+            // Create semi-transparent material with higher render queue to appear on top
+            Material hoverMat = new Material(Shader.Find("Standard"));
             hoverMat.color = hoverColor;
-            hoverHighlight.GetComponent<Renderer>().material = hoverMat;
+            hoverMat.SetFloat("_Mode", 3); // Transparent mode
+            hoverMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            hoverMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            hoverMat.SetInt("_ZWrite", 0); // Disable depth write for transparency
+            hoverMat.DisableKeyword("_ALPHATEST_ON");
+            hoverMat.EnableKeyword("_ALPHABLEND_ON");
+            hoverMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            hoverMat.renderQueue = 3100; // Much higher than range visualizer (3000) to ensure it renders on top
+            
+            Renderer hoverRenderer = hoverHighlight.GetComponent<Renderer>();
+            if (hoverRenderer != null)
+            {
+                hoverRenderer.material = hoverMat;
+                hoverRenderer.sortingOrder = 100; // Also set sorting order for 2D sorting
+                // Ensure the renderer respects the render queue
+                hoverRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                hoverRenderer.receiveShadows = false;
+            }
 
             // Remove collider
             Destroy(hoverHighlight.GetComponent<Collider>());
@@ -60,22 +96,48 @@ namespace Riftbourne.Grid
 
         private void UpdateHoverHighlight()
         {
-            if (gridManager == null || Camera.main == null || Mouse.current == null)
+            // Ensure hover highlight exists
+            if (hoverHighlight == null)
             {
-                hoverHighlight?.SetActive(false);
+                if (gridManager != null)
+                {
+                    CreateHoverHighlight();
+                }
+                return;
+            }
+
+            if (gridManager == null || Mouse.current == null)
+            {
+                hoverHighlight.SetActive(false);
+                return;
+            }
+
+            // Get camera - use CameraService if available, otherwise fallback to Camera.main
+            Camera cam = null;
+            if (cameraService != null && cameraService.MainCamera != null)
+            {
+                cam = cameraService.MainCamera;
+            }
+            else
+            {
+                cam = Camera.main;
+            }
+
+            if (cam == null)
+            {
+                hoverHighlight.SetActive(false);
                 return;
             }
 
             // Use New Input System for mouse position
-            Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
+            Ray ray = cam.ScreenPointToRay(Mouse.current.position.ReadValue());
             RaycastHit hit;
 
-            // Raycast to find what we're hovering over
-            if (Physics.Raycast(ray, out hit))
+            // Raycast to find what we're hovering over (use longer distance to ensure we hit)
+            // Use LayerMask to ignore UI and other layers if needed
+            int layerMask = ~0; // All layers
+            if (Physics.Raycast(ray, out hit, 100f, layerMask))
             {
-                // Debug first hit
-                // Debug.Log($"Hit: {hit.collider.name} at {hit.point}");
-                
                 // Check if we hit a unit (has Unit component)
                 Riftbourne.Characters.Unit hoveredUnit = hit.collider.GetComponent<Riftbourne.Characters.Unit>();
                 
@@ -112,6 +174,11 @@ namespace Riftbourne.Grid
 
         private void ShowHoverAtCell(int x, int y)
         {
+            if (hoverHighlight == null)
+            {
+                return;
+            }
+
             GridCell cell = gridManager.GetCell(x, y);
             
             if (cell == null)
@@ -121,16 +188,13 @@ namespace Riftbourne.Grid
                 return;
             }
 
-            // Only update if we've moved to a different cell
-            if (currentHoverCell != cell)
-            {
-                currentHoverCell = cell;
+            // Always update position and show (even if same cell, to ensure it's visible)
+            currentHoverCell = cell;
 
-                Vector3 highlightPos = cell.WorldPosition;
-                highlightPos.y = hoverHeight;
-                hoverHighlight.transform.position = highlightPos;
-                hoverHighlight.SetActive(true);
-            }
+            Vector3 highlightPos = cell.WorldPosition;
+            highlightPos.y = hoverHeight;
+            hoverHighlight.transform.position = highlightPos;
+            hoverHighlight.SetActive(true);
         }
 
         /// <summary>

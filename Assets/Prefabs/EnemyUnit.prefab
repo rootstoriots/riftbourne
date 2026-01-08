@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 7867312870576611441}
   - component: {fileID: 6189617795732575617}
   - component: {fileID: 5032910207788555657}
+  - component: {fileID: -4084713091064031601}
   m_Layer: 0
   m_Name: EnemyUnit
   m_TagString: Untagged
@@ -131,11 +132,42 @@ MonoBehaviour:
   gridX: 0
   gridY: 0
   movementRange: 5
-  moveSpeed: 5
-  maxHP: 80
   maxHP: 80
   currentHP: 0
   attackPower: 15
   defensePower: 3
+  strength: 5
+  finesse: 5
+  focus: 5
+  speed: 5
+  luck: 5
+  hpDisplay: {fileID: 0}
+  mantle: 0
+  knownSkills: []
+  meleeWeapon: {fileID: 0}
+  rangedWeapon: {fileID: 0}
+  armor: {fileID: 0}
+  accessory1: {fileID: 0}
+  accessory2: {fileID: 0}
+  codex: {fileID: 0}
   unitName: Enemy
   isPlayerControlled: 0
+  level: 1
+  currentXP: 0
+  skillPoints: 0
+  totalActions: 0
+--- !u!114 &-4084713091064031601
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 402787091324160107}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1daadfa1161011d4ab0b59b423760573, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Characters.SkillTargetingController
+  unit: {fileID: 0}
+  gridManager: {fileID: 0}
+  turnManager: {fileID: 0}

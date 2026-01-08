@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using Riftbourne.Characters;
+using Riftbourne.Core;
 
 namespace Riftbourne.UI
 {
@@ -14,10 +15,31 @@ namespace Riftbourne.UI
         [Header("Settings")]
         [SerializeField] private Vector3 offset = new Vector3(0, 2, 0);
 
+        private CameraService cameraService;
+
         private void Awake()
         {
             unit = GetComponentInParent<Unit>();
+            cameraService = CameraService.Instance;
             CreateHPDisplay();
+        }
+
+        private void OnEnable()
+        {
+            if (unit != null)
+            {
+                unit.OnHPChanged += UpdateHPDisplay;
+                // Update immediately when enabled
+                UpdateHPDisplay(unit.CurrentHP, unit.MaxHP);
+            }
+        }
+
+        private void OnDisable()
+        {
+            if (unit != null)
+            {
+                unit.OnHPChanged -= UpdateHPDisplay;
+            }
         }
 
         private void CreateHPDisplay()
@@ -68,34 +90,42 @@ namespace Riftbourne.UI
             textRect.sizeDelta = Vector2.zero; // Fill parent
 
             // Make canvas face camera initially
-            canvasObj.transform.LookAt(Camera.main.transform);
-            canvasObj.transform.Rotate(0, 180, 0);
+            if (cameraService != null && cameraService.MainCamera != null)
+            {
+                canvasObj.transform.LookAt(cameraService.MainCamera.transform);
+                canvasObj.transform.Rotate(0, 180, 0);
+            }
 
             Debug.Log($"HPDisplay created for {unit.UnitName}: Canvas size = {canvasRect.sizeDelta}, Position = {canvasObj.transform.position}");
         }
 
         private void Update()
         {
-            if (unit != null && hpText != null)
+            // Only update camera facing - HP updates are event-driven
+            if (canvas != null && cameraService != null && cameraService.MainCamera != null)
             {
-                hpText.text = $"{unit.UnitName}\n{unit.CurrentHP}/{unit.MaxHP}";
-
-                // Change color based on HP percentage
-                float hpPercent = (float)unit.CurrentHP / unit.MaxHP;
-                if (hpPercent > 0.5f)
-                    hpText.color = Color.green;
-                else if (hpPercent > 0.25f)
-                    hpText.color = Color.yellow;
-                else
-                    hpText.color = Color.red;
-            }
-
-            // Always face the camera
-            if (canvas != null && Camera.main != null)
-            {
-                canvas.transform.LookAt(Camera.main.transform);
+                canvas.transform.LookAt(cameraService.MainCamera.transform);
                 canvas.transform.Rotate(0, 180, 0);
             }
+        }
+
+        /// <summary>
+        /// Event handler for HP changes. Updates the display text and color.
+        /// </summary>
+        private void UpdateHPDisplay(int currentHP, int maxHP)
+        {
+            if (unit == null || hpText == null) return;
+
+            hpText.text = $"{unit.UnitName}\n{currentHP}/{maxHP}";
+
+            // Change color based on HP percentage
+            float hpPercent = (float)currentHP / maxHP;
+            if (hpPercent > 0.5f)
+                hpText.color = Color.green;
+            else if (hpPercent > 0.25f)
+                hpText.color = Color.yellow;
+            else
+                hpText.color = Color.red;
         }
     }
 }

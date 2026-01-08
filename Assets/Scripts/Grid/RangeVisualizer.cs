@@ -24,7 +24,7 @@ namespace Riftbourne.Grid
 
             foreach (GridCell cell in cells)
             {
-                CreateHighlight(cell, movementRangeMaterial, 0.04f);
+                CreateHighlight(cell, movementRangeMaterial, 0.02f); // Lowered so hover can appear above
             }
 
             Debug.Log($"RangeVisualizer: Showing {cells.Count} movement cells");
@@ -39,7 +39,7 @@ namespace Riftbourne.Grid
 
             foreach (GridCell cell in cells)
             {
-                CreateHighlight(cell, attackRangeMaterial, 0.04f);
+                CreateHighlight(cell, attackRangeMaterial, 0.02f); // Lowered so hover can appear above
             }
 
             Debug.Log($"RangeVisualizer: Showing {cells.Count} attack cells");
@@ -82,11 +82,16 @@ namespace Riftbourne.Grid
             // Remove collider (we don't need physics)
             Destroy(highlight.GetComponent<Collider>());
 
-            // Apply material
+            // Apply material with lower render queue so hover can appear on top
             MeshRenderer renderer = highlight.GetComponent<MeshRenderer>();
-            if (renderer != null && material != null)
+            if (renderer != null)
             {
-                renderer.material = material;
+                if (material != null)
+                {
+                    renderer.material = material;
+                }
+                // Set render queue to be lower than hover highlight (3000 vs 3001)
+                renderer.material.renderQueue = 3000;
             }
 
             activeHighlights.Add(highlight);
