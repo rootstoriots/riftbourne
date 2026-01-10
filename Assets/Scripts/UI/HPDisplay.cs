@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using Riftbourne.Characters;
 using Riftbourne.Core;
+using System.Collections;
 
 namespace Riftbourne.UI
 {
@@ -14,8 +15,10 @@ namespace Riftbourne.UI
 
         [Header("Settings")]
         [SerializeField] private Vector3 offset = new Vector3(0, 2, 0);
+        [SerializeField] private float missDisplayDuration = 1.5f;
 
         private CameraService cameraService;
+        private Coroutine missDisplayCoroutine;
 
         private void Awake()
         {
@@ -32,6 +35,9 @@ namespace Riftbourne.UI
                 // Update immediately when enabled
                 UpdateHPDisplay(unit.CurrentHP, unit.MaxHP);
             }
+            
+            // Subscribe to attack miss events
+            GameEvents.OnAttackMissed += OnAttackMissed;
         }
 
         private void OnDisable()
@@ -40,6 +46,9 @@ namespace Riftbourne.UI
             {
                 unit.OnHPChanged -= UpdateHPDisplay;
             }
+            
+            // Unsubscribe from attack miss events
+            GameEvents.OnAttackMissed -= OnAttackMissed;
         }
 
         private void CreateHPDisplay()
@@ -126,6 +135,53 @@ namespace Riftbourne.UI
                 hpText.color = Color.yellow;
             else
                 hpText.color = Color.red;
+        }
+
+        /// <summary>
+        /// Event handler for when an attack misses this unit.
+        /// Displays "Missed!" temporarily on the HP display.
+        /// </summary>
+        private void OnAttackMissed(Unit targetUnit)
+        {
+            // Only show miss if this is the unit that was missed
+            if (targetUnit == unit && hpText != null)
+            {
+                // Stop any existing miss display coroutine
+                if (missDisplayCoroutine != null)
+                {
+                    StopCoroutine(missDisplayCoroutine);
+                }
+                
+                // Start new miss display
+                missDisplayCoroutine = StartCoroutine(ShowMissedMessage());
+            }
+        }
+
+        /// <summary>
+        /// Coroutine that displays "Missed!" message temporarily, then restores HP display.
+        /// </summary>
+        private IEnumerator ShowMissedMessage()
+        {
+            if (hpText == null || unit == null) yield break;
+
+            // Store original text and color
+            string originalText = hpText.text;
+            Color originalColor = hpText.color;
+
+            // Show "Missed!" message
+            hpText.text = "Missed!";
+            hpText.color = Color.yellow; // Yellow color for miss indication
+
+            // Wait for the display duration
+            yield return new WaitForSeconds(missDisplayDuration);
+
+            // Restore original HP display
+            if (hpText != null && unit != null)
+            {
+                UpdateHPDisplay(unit.CurrentHP, unit.MaxHP);
+            }
+
+            missDisplayCoroutine = null;
         }
     }
 }

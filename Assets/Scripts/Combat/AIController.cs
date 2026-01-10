@@ -189,6 +189,17 @@ namespace Riftbourne.Combat
                 return;
             }
 
+            // Check if unit is stunned - if so, skip turn
+            if (controlledUnit.IsStunned())
+            {
+                Debug.Log($"[AI] {controlledUnit.UnitName} is stunned and skips their turn!");
+                if (turnManager != null)
+                {
+                    turnManager.EndTurn(controlledUnit);
+                }
+                return;
+            }
+
             // Managers should already be cached from Start()
             // Only check for null and log errors - don't re-fetch to avoid performance overhead
             if (gridManager == null)

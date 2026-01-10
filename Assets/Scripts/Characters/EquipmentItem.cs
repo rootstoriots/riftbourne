@@ -17,6 +17,20 @@ namespace Riftbourne.Characters
         [Tooltip("Which slots can this item be equipped in? (Can select multiple)")]
         [SerializeField] private System.Collections.Generic.List<EquipmentSlot> compatibleSlots = new System.Collections.Generic.List<EquipmentSlot>();
 
+        [Header("Equipment Type")]
+        [Tooltip("The type of melee weapon (only relevant if compatible with MeleeWeapon slot)")]
+        [SerializeField] private MeleeWeaponType meleeWeaponType = MeleeWeaponType.None;
+        
+        [Tooltip("The type of ranged weapon (only relevant if compatible with RangedWeapon slot)")]
+        [SerializeField] private RangedWeaponType rangedWeaponType = RangedWeaponType.None;
+        
+        [Tooltip("The type of armor (only relevant if compatible with Armor slot)")]
+        [SerializeField] private ArmorType armorType = ArmorType.None;
+
+        [Header("Ranged Weapon Properties")]
+        [Tooltip("Range bonus for ranged weapons (only relevant if compatible with RangedWeapon slot). Base range is 3, this adds to it.")]
+        [SerializeField] private int rangeBonus = 0;
+
         [Header("Skill Learning")]
         [Tooltip("The combat skills this equipment grants access to (can teach multiple skills)")]
         [SerializeField] private System.Collections.Generic.List<Skill> grantedSkills = new System.Collections.Generic.List<Skill>();
@@ -38,10 +52,18 @@ namespace Riftbourne.Characters
         [Tooltip("Percentage-based bonuses (e.g., 10 = +10%)")]
         [SerializeField] private float maxHPBonusPercent = 0f;  // +10% max HP, etc.
 
+        [Header("Visual")]
+        [Tooltip("Icon sprite for this equipment item. Used in hotbar and UI displays.")]
+        [SerializeField] private Sprite icon;
+
         // Properties
         public string ItemName => itemName;
         public string Description => description;
         public System.Collections.Generic.List<EquipmentSlot> CompatibleSlots => compatibleSlots;
+        public MeleeWeaponType MeleeWeaponType => meleeWeaponType;
+        public RangedWeaponType RangedWeaponType => rangedWeaponType;
+        public ArmorType ArmorType => armorType;
+        public int RangeBonus => rangeBonus;
         public System.Collections.Generic.List<Skill> GrantedSkills => grantedSkills;
         public System.Collections.Generic.List<PassiveSkill> GrantedPassiveSkills => grantedPassiveSkills;
         public int AttackBonus => attackBonus;
@@ -52,6 +74,7 @@ namespace Riftbourne.Characters
         public int SpeedBonus => speedBonus;
         public int LuckBonus => luckBonus;
         public float MaxHPBonusPercent => maxHPBonusPercent;
+        public Sprite Icon => icon;
 
         /// <summary>
         /// Does this equipment teach any skills?

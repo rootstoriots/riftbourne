@@ -140,7 +140,6 @@ namespace Riftbourne.Characters
                     return;
                 }
 
-                // Attempt attack - if not adjacent, show message but don't move
                 AttackAction attackAction = ManagerRegistry.Get<AttackAction>();
                 // Fallback to Instance property which will auto-create if needed
                 if (attackAction == null)
@@ -148,13 +147,54 @@ namespace Riftbourne.Characters
                     attackAction = AttackAction.Instance;
                 }
                 
-                if (attackAction == null || !attackAction.ExecuteMeleeAttack(unit, targetUnit))
+                if (attackAction == null)
                 {
-                    // Attack failed (likely not adjacent) - don't allow movement to enemy's position
-                    Debug.Log($"Cannot attack {targetUnit.UnitName} - must be adjacent!");
+                    Debug.LogWarning("AttackAction is null!");
                     return;
                 }
-                // Attack succeeded - MarkAsActed is already called by AttackAction
+
+                // Check if unit has ranged weapon and target is in range
+                bool hasRangedWeapon = unit.AttackRange > 1;
+                int dx = Mathf.Abs(unit.GridX - targetUnit.GridX);
+                int dy = Mathf.Abs(unit.GridY - targetUnit.GridY);
+                int attackDistance = Mathf.Max(dx, dy); // Chebyshev distance
+                bool inRangedRange = attackDistance <= unit.AttackRange;
+                bool isAdjacent = attackDistance == 1;
+
+                // Try ranged attack if unit has ranged weapon and target is in range
+                if (hasRangedWeapon && inRangedRange)
+                {
+                    if (attackAction.ExecuteRangedAttack(unit, targetUnit))
+                    {
+                        // Attack succeeded - MarkAsActed is already called by AttackAction
+                        return;
+                    }
+                    // Ranged attack failed for some reason, fall through to melee attempt
+                }
+
+                // Try melee attack if adjacent
+                if (isAdjacent)
+                {
+                    if (attackAction.ExecuteMeleeAttack(unit, targetUnit))
+                    {
+                        // Attack succeeded - MarkAsActed is already called by AttackAction
+                        return;
+                    }
+                }
+
+                // Attack failed - show appropriate message
+                if (hasRangedWeapon && !inRangedRange)
+                {
+                    Debug.Log($"Cannot attack {targetUnit.UnitName} - out of range! Distance: {attackDistance}, Range: {unit.AttackRange}");
+                }
+                else if (!isAdjacent)
+                {
+                    Debug.Log($"Cannot attack {targetUnit.UnitName} - must be adjacent!");
+                }
+                else
+                {
+                    Debug.Log($"Cannot attack {targetUnit.UnitName}!");
+                }
                 return;
             }
 
@@ -263,6 +303,7 @@ namespace Riftbourne.Characters
 
         /// <summary>
         /// Public method for clicking enemies to attack them.
+        /// Tries ranged attack first if available, then melee.
         /// </summary>
         public void AttemptAttackOnTarget(Unit targetUnit)
         {
@@ -279,10 +320,39 @@ namespace Riftbourne.Characters
                 attackAction = AttackAction.Instance;
             }
             
-            if (attackAction != null && attackAction.ExecuteMeleeAttack(unit, targetUnit))
+            if (attackAction == null)
             {
-                unit.MarkAsActed();
+                Debug.LogWarning("AttackAction is null!");
+                return;
             }
+
+            // Check if unit has ranged weapon and target is in range
+            bool hasRangedWeapon = unit.AttackRange > 1;
+            int dx = Mathf.Abs(unit.GridX - targetUnit.GridX);
+            int dy = Mathf.Abs(unit.GridY - targetUnit.GridY);
+            int distance = Mathf.Max(dx, dy); // Chebyshev distance
+            bool inRangedRange = distance <= unit.AttackRange;
+            bool isAdjacent = distance == 1;
+
+            // Try ranged attack if unit has ranged weapon and target is in range
+            if (hasRangedWeapon && inRangedRange)
+            {
+                if (attackAction.ExecuteRangedAttack(unit, targetUnit))
+                {
+                    // Attack succeeded - MarkAsActed is already called by AttackAction
+                    return;
+                }
+            }
+
+            // Try melee attack if adjacent
+            if (isAdjacent && attackAction.ExecuteMeleeAttack(unit, targetUnit))
+            {
+                // Attack succeeded - MarkAsActed is already called by AttackAction
+                return;
+            }
+
+            // Attack failed
+            Debug.Log($"Cannot attack {targetUnit.UnitName}!");
         }
 
     }

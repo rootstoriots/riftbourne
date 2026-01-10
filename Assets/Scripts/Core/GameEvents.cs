@@ -48,6 +48,12 @@ namespace Riftbourne.Core
         /// </summary>
         public static event Action<Unit, int> OnUnitHealed;
 
+        /// <summary>
+        /// Event raised when an attack misses a unit.
+        /// Parameters: (targetUnit)
+        /// </summary>
+        public static event Action<Unit> OnAttackMissed;
+
         // Combat Events
         /// <summary>
         /// Event raised when the turn window changes (units that can act).
@@ -126,12 +132,12 @@ namespace Riftbourne.Core
 
         public static void RaiseUnitHealed(Unit unit, int healAmount)
         {
-            // Ensure DamageIndicatorManager is initialized
-            if (OnUnitHealed == null || OnUnitHealed.GetInvocationList().Length == 0)
-            {
-                _ = Riftbourne.UI.DamageIndicatorManager.Instance;
-            }
             OnUnitHealed?.Invoke(unit, healAmount);
+        }
+
+        public static void RaiseAttackMissed(Unit targetUnit)
+        {
+            OnAttackMissed?.Invoke(targetUnit);
         }
     }
 }

@@ -49,6 +49,8 @@ namespace Riftbourne.Characters
         [Header("Unit Identity")]
         [SerializeField] private string unitName = "Unit";
         [SerializeField] private bool isPlayerControlled = true;
+        [Tooltip("Portrait sprite for this unit. If not set, will use default portrait generator.")]
+        [SerializeField] private Sprite portrait;
         
         [Header("Faction Assignment")]
         [Tooltip("Option 1: Use ScriptableObject faction (recommended for custom factions)")]
@@ -83,6 +85,9 @@ namespace Riftbourne.Characters
         private UnitProgression unitProgression;
         private UnitEquipment unitEquipment;
         private UnitStatusEffects unitStatusEffects;
+        
+        // Public access to component classes
+        public UnitEquipment UnitEquipment => unitEquipment;
 
         // Events
         /// <summary>
@@ -110,8 +115,29 @@ namespace Riftbourne.Characters
         // Movement Range (includes passive skill bonuses)
         public new int MovementRange => base.MovementRange + (unitEquipment?.GetTotalMovementRangeBonus() ?? 0);
         
+        /// <summary>
+        /// Gets the attack range for this unit.
+        /// - If ranged weapon is equipped: minimum 3 + equipment range bonus
+        /// - If no ranged weapon: 1 (melee range)
+        /// Skills use their own range and are not affected by this property.
+        /// </summary>
+        public int AttackRange
+        {
+            get
+            {
+                if (unitEquipment != null && unitEquipment.HasRangedWeapon())
+                {
+                    // Minimum 3 range for ranged weapons, plus equipment bonus
+                    return Mathf.Max(3, 3 + unitEquipment.GetRangedWeaponRangeBonus());
+                }
+                // Melee range
+                return 1;
+            }
+        }
+        
         public string UnitName => unitName;
         public bool IsPlayerControlled => isPlayerControlled;
+        public Sprite Portrait => portrait;
         
         /// <summary>
         /// Get the faction enum. If using ScriptableObject faction, returns the mapped enum.
@@ -479,6 +505,22 @@ namespace Riftbourne.Characters
 
             // Apply status effect damage (burn, poison, etc.)
             unitStatusEffects?.ApplyStatusEffectDamage();
+
+            // Check if unit is stunned - if so, automatically end their turn
+            if (IsStunned())
+            {
+                Debug.Log($"{unitName} is stunned and skips their turn!");
+                TurnManager turnManager = ManagerRegistry.Get<TurnManager>();
+                if (turnManager != null)
+                {
+                    // End turn immediately - unit cannot act
+                    turnManager.EndTurn(this);
+                }
+                else
+                {
+                    Debug.LogWarning($"{unitName} is stunned but TurnManager is not available!");
+                }
+            }
         }
 
         /// <summary>
@@ -499,6 +541,35 @@ namespace Riftbourne.Characters
             {
                 Debug.Log($"{unitName} took {damage} damage! HP: {currentHP}/{MaxHP}");
             }
+
+            // Raise HP changed events (both local and global)
+            OnHPChanged?.Invoke(currentHP, MaxHP);
+            GameEvents.RaiseUnitHPChanged(this, currentHP, MaxHP);
+
+            // Raise damage event for damage indicators
+            if (damage > 0)
+            {
+                GameEvents.RaiseUnitDamaged(this, damage);
+            }
+
+            if (!IsAlive)
+            {
+                OnDeath();
+            }
+
+            return damage;
+        }
+
+        /// <summary>
+        /// Take pre-calculated damage (defense already applied by CombatCalculator).
+        /// Returns actual damage dealt.
+        /// </summary>
+        public int TakeDamageDirect(int finalDamage)
+        {
+            int damage = unitCombat.TakeDamageDirect(finalDamage);
+            currentHP = unitCombat.CurrentHP;
+
+            Debug.Log($"{unitName} took {damage} damage! HP: {currentHP}/{MaxHP}");
 
             // Raise HP changed events (both local and global)
             OnHPChanged?.Invoke(currentHP, MaxHP);
@@ -726,6 +797,46 @@ namespace Riftbourne.Characters
         public void ApplyBurn(int damagePerTurn, int duration)
         {
             unitStatusEffects?.ApplyBurn(damagePerTurn, duration);
+        }
+
+        /// <summary>
+        /// Get total hit chance modifier from all active status effects.
+        /// </summary>
+        public float GetTotalHitChanceModifier()
+        {
+            return unitStatusEffects?.GetTotalHitChanceModifier() ?? 0f;
+        }
+
+        /// <summary>
+        /// Get total critical hit chance modifier from all active status effects.
+        /// </summary>
+        public float GetTotalCritChanceModifier()
+        {
+            return unitStatusEffects?.GetTotalCritChanceModifier() ?? 0f;
+        }
+
+        /// <summary>
+        /// Get total parry chance modifier from all active status effects.
+        /// </summary>
+        public float GetTotalParryChanceModifier()
+        {
+            return unitStatusEffects?.GetTotalParryChanceModifier() ?? 0f;
+        }
+
+        /// <summary>
+        /// Get total critical defense modifier from all active status effects.
+        /// </summary>
+        public float GetTotalCritDefenseModifier()
+        {
+            return unitStatusEffects?.GetTotalCritDefenseModifier() ?? 0f;
+        }
+
+        /// <summary>
+        /// Check if this unit is stunned (has any status effect that prevents actions).
+        /// </summary>
+        public bool IsStunned()
+        {
+            return unitStatusEffects?.IsStunned() ?? false;
         }
 
         /// <summary>

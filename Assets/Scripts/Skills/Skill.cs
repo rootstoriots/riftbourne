@@ -50,6 +50,15 @@ namespace Riftbourne.Skills
         [Tooltip("Duration override for status effect (uses StatusEffectData default if 0)")]
         [SerializeField] private int statusEffectDurationOverride = 0;
         
+        [Header("Stun Effect")]
+        [Tooltip("Chance for this skill to stun the target (0-100%). If 0, skill cannot stun.")]
+        [Range(0f, 100f)]
+        [SerializeField] private float stunChance = 0f;
+        [Tooltip("Duration of stun if it triggers (in turns)")]
+        [SerializeField] private int stunDuration = 1;
+        [Tooltip("Optional: Stun StatusEffectData to apply. If not set, will use a default stun effect.")]
+        [SerializeField] private Combat.StatusEffectData stunStatusEffectData;
+        
         [Header("Legacy Burn Settings (Deprecated - use Status Effects above)")]
         [SerializeField] private bool appliesBurn = false;
         [SerializeField] private int burnDuration = 3;
@@ -67,6 +76,18 @@ namespace Riftbourne.Skills
         [Header("Targeting")]
         [SerializeField] private int range = 1; // Manhattan distance
         [SerializeField] private bool requiresLineOfSight = true;
+        
+        [Header("Area of Effect (AOE)")]
+        [Tooltip("How this AOE skill targets - from caster or at a location")]
+        [SerializeField] private AOEType aoeType = AOEType.None;
+        [Tooltip("Pattern type for AOE effect")]
+        [SerializeField] private AOEPatternType aoePattern = AOEPatternType.None;
+        [Tooltip("AOE size/radius (uses skill range if 0). For Line patterns, this is the max length. For Cloud, this is the radius.")]
+        [SerializeField] private int aoeSize = 0;
+
+        [Header("Visual")]
+        [Tooltip("Icon sprite for this skill. Used in hotbar and UI displays.")]
+        [SerializeField] private Sprite icon;
 
         // Public properties
         public string SkillName => skillName;
@@ -83,6 +104,9 @@ namespace Riftbourne.Skills
         public bool AppliesStatusEffect => appliesStatusEffect || appliesBurn; // Support legacy burn
         public Combat.StatusEffectData StatusEffectData => statusEffectData;
         public int StatusEffectDurationOverride => statusEffectDurationOverride;
+        public float StunChance => stunChance;
+        public int StunDuration => stunDuration;
+        public Combat.StatusEffectData StunStatusEffectData => stunStatusEffectData;
         
         // Legacy burn properties (for backward compatibility)
         public bool AppliesBurn => appliesBurn || (appliesStatusEffect && statusEffectData != null && statusEffectData.EffectName == "Burn");
@@ -90,10 +114,14 @@ namespace Riftbourne.Skills
         public int BurnDamagePerTurn => burnDamagePerTurn;
         public int Range => range;
         public bool RequiresLineOfSight => requiresLineOfSight;
+        public AOEType AOEType => aoeType;
+        public AOEPatternType AOEPattern => aoePattern;
+        public int AOESize => aoeSize > 0 ? aoeSize : range; // Use range as fallback
         public bool CreatesGroundHazard => createsGroundHazard;
         public Grid.HazardData HazardData => hazardData;
         public int HazardDuration => hazardDuration;
         public int HazardDamagePerTurn => hazardDamagePerTurn;
+        public Sprite Icon => icon;
 
         /// <summary>
         /// Checks if a unit can use this skill.

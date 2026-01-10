@@ -420,6 +420,45 @@ namespace Riftbourne.Grid
         }
 
         /// <summary>
+        /// Show AOE pattern visualization for a skill.
+        /// </summary>
+        public void ShowAOEPattern(Riftbourne.Skills.Skill skill, int sourceX, int sourceY, int targetX, int targetY)
+        {
+            if (rangeVisualizer == null || skill == null) return;
+
+            if (skill.AOEType == Riftbourne.Skills.AOEType.None || skill.AOEPattern == Riftbourne.Skills.AOEPatternType.None)
+            {
+                // Not an AOE skill - just show range
+                ShowSkillRange(sourceX, sourceY, skill.Range);
+                return;
+            }
+
+            // Always clear highlights first to ensure clean display
+            if (rangeVisualizer != null)
+            {
+                rangeVisualizer.ClearHighlights();
+            }
+
+            // Calculate affected cells using the same method as execution
+            List<GridCell> affectedCells = Riftbourne.Skills.AOECalculator.GetAffectedCells(
+                skill.AOEPattern,
+                skill.AOEType,
+                sourceX,
+                sourceY,
+                targetX,
+                targetY,
+                skill.AOESize,
+                this
+            );
+
+            // Show the AOE pattern - this will display exactly what execution will affect
+            if (rangeVisualizer != null && affectedCells != null && affectedCells.Count > 0)
+            {
+                rangeVisualizer.ShowAttackRange(affectedCells);
+            }
+        }
+
+        /// <summary>
         /// Clear all range highlights.
         /// </summary>
         public void ClearRangeHighlights()

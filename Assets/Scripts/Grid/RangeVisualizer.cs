@@ -35,14 +35,18 @@ namespace Riftbourne.Grid
         /// </summary>
         public void ShowAttackRange(List<GridCell> cells)
         {
+            if (cells == null) return;
+
             ClearHighlights();
 
+            // Create highlights for each cell - this displays exactly what will be affected
             foreach (GridCell cell in cells)
             {
-                CreateHighlight(cell, attackRangeMaterial, 0.02f); // Lowered so hover can appear above
+                if (cell != null)
+                {
+                    CreateHighlight(cell, attackRangeMaterial, 0.02f); // Lowered so hover can appear above
+                }
             }
-
-            Debug.Log($"RangeVisualizer: Showing {cells.Count} attack cells");
         }
 
         /// <summary>

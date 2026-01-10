@@ -82,15 +82,161 @@ namespace Riftbourne.Combat
                 return false;
             }
 
-            // Execute attack
-            Debug.Log($"{attacker.UnitName} attacks {target.UnitName}!");
-            int damageDealt = target.TakeDamage(attacker.AttackPower);
-            Debug.Log($"Attack dealt {damageDealt} damage!");
+            // Calculate combat result (hit/miss, parry, crit)
+            CombatCalculator.CombatResult result = CombatCalculator.CalculateAttack(attacker, target, attacker.AttackPower);
+            
+            // Handle miss
+            if (!result.Hit)
+            {
+                Debug.Log($"{attacker.UnitName}'s attack missed!");
+                
+                // Raise event for UI to display "Missed!" on HP indicator
+                Riftbourne.Core.GameEvents.RaiseAttackMissed(target);
+                
+                // Still record action and award XP for attempting attack
+                attacker.RecordAction();
+                int baseXP = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
+                attacker.AwardXP(baseXP);
+                attacker.MarkAsActed();
+                return true; // Attack was attempted, even if it missed
+            }
+            
+            // Handle parry
+            if (result.Parried)
+            {
+                Debug.Log($"{target.UnitName} parried {attacker.UnitName}'s attack!");
+                // Still record action and award XP for attempting attack
+                attacker.RecordAction();
+                int baseXP = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
+                attacker.AwardXP(baseXP);
+                attacker.MarkAsActed();
+                return true; // Attack was attempted, even if parried
+            }
+            
+            // Apply damage (already calculated with defense by CombatCalculator)
+            int damageDealt = target.TakeDamageDirect(result.FinalDamage);
+            
+            string damageMessage = $"Attack dealt {damageDealt} damage";
+            if (result.CriticalHit && !result.CriticalDefense)
+            {
+                damageMessage += " (CRITICAL HIT!)";
+            }
+            else if (result.CriticalHit && result.CriticalDefense)
+            {
+                damageMessage += " (critical defended)";
+            }
+            Debug.Log($"{attacker.UnitName} attacks {target.UnitName}! {damageMessage}!");
             
             // Record action and award XP
             attacker.RecordAction();  // Award SP based on action count
-            int baseXP = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
-            attacker.AwardXP(baseXP);
+            int baseXP2 = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
+            attacker.AwardXP(baseXP2);
+            
+            // Award bonus XP if target died
+            if (!target.IsAlive)
+            {
+                int killBonus = GameConstants.Instance != null ? GameConstants.Instance.KillBonusXP : 25;
+                attacker.AwardXP(killBonus);
+            }
+
+            // Mark attacker as acted (caller can still decide when to end turn)
+            attacker.MarkAsActed();
+
+            return true;
+        }
+
+        /// <summary>
+        /// Execute a ranged attack from attacker to target.
+        /// Returns true if attack was successful.
+        /// </summary>
+        public bool ExecuteRangedAttack(Unit attacker, Unit target)
+        {
+            // Validate units exist and are alive
+            if (attacker == null || target == null)
+            {
+                Debug.LogWarning("AttackAction: Null unit in ranged attack!");
+                return false;
+            }
+
+            if (!attacker.IsAlive)
+            {
+                Debug.LogWarning($"AttackAction: {attacker.UnitName} is dead and cannot attack!");
+                return false;
+            }
+
+            if (!target.IsAlive)
+            {
+                Debug.LogWarning($"AttackAction: Cannot attack dead target {target.UnitName}!");
+                return false;
+            }
+
+            // Check if attacker has a ranged weapon
+            if (attacker.AttackRange <= 1)
+            {
+                Debug.LogWarning($"AttackAction: {attacker.UnitName} does not have a ranged weapon equipped!");
+                return false;
+            }
+
+            // Check if target is in range (Chebyshev distance)
+            int dx = Mathf.Abs(attacker.GridX - target.GridX);
+            int dy = Mathf.Abs(attacker.GridY - target.GridY);
+            int distance = Mathf.Max(dx, dy); // Chebyshev distance
+
+            if (distance > attacker.AttackRange)
+            {
+                Debug.LogWarning($"AttackAction: {target.UnitName} is out of range! Distance: {distance}, Range: {attacker.AttackRange}");
+                return false;
+            }
+
+            // Calculate combat result (hit/miss, parry, crit)
+            CombatCalculator.CombatResult result = CombatCalculator.CalculateAttack(attacker, target, attacker.AttackPower);
+            
+            // Handle miss
+            if (!result.Hit)
+            {
+                Debug.Log($"{attacker.UnitName}'s ranged attack missed!");
+                
+                // Raise event for UI to display "Missed!" on HP indicator
+                Riftbourne.Core.GameEvents.RaiseAttackMissed(target);
+                
+                // Still record action and award XP for attempting attack
+                attacker.RecordAction();
+                int baseXP = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
+                attacker.AwardXP(baseXP);
+                attacker.MarkAsActed();
+                return true; // Attack was attempted, even if it missed
+            }
+            
+            // Handle parry
+            if (result.Parried)
+            {
+                Debug.Log($"{target.UnitName} parried {attacker.UnitName}'s ranged attack!");
+                // Still record action and award XP for attempting attack
+                attacker.RecordAction();
+                int baseXP = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
+                attacker.AwardXP(baseXP);
+                attacker.MarkAsActed();
+                return true; // Attack was attempted, even if parried
+            }
+            
+            // Apply damage (already calculated with defense by CombatCalculator)
+            int damageDealt = target.TakeDamageDirect(result.FinalDamage);
+            
+            string damageMessage = $"Ranged attack dealt {damageDealt} damage";
+            if (result.CriticalHit && !result.CriticalDefense)
+            {
+                damageMessage += " (CRITICAL HIT!)";
+            }
+            else if (result.CriticalHit && result.CriticalDefense)
+            {
+                damageMessage += " (critical defended)";
+            }
+            Debug.Log($"{attacker.UnitName} performs ranged attack on {target.UnitName}! {damageMessage}!");
+            
+            // Record action and award XP
+            attacker.RecordAction();  // Award SP based on action count
+            int baseXP2 = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
+            attacker.AwardXP(baseXP2);
             
             // Award bonus XP if target died
             if (!target.IsAlive)

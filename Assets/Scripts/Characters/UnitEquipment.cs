@@ -144,15 +144,44 @@ namespace Riftbourne.Characters
 
             foreach (var item in equippedItems.Values)
             {
-                if (item.TeachesSkills)
+                if (item != null && item.TeachesSkills)
                 {
+                if (item.GrantedSkills == null)
+                {
+                    // Only log warning once, not every frame
+                    // UnityEngine.Debug.LogWarning($"{unit.UnitName}: Equipment item {item.ItemName} has TeachesSkills=true but GrantedSkills is null!");
+                    continue;
+                }
+                
+                if (item.GrantedSkills.Count == 0)
+                {
+                    // Only log warning once, not every frame
+                    // UnityEngine.Debug.LogWarning($"{unit.UnitName}: Equipment item {item.ItemName} has TeachesSkills=true but GrantedSkills list is empty!");
+                    continue;
+                }
+                    
                     foreach (Skill skill in item.GrantedSkills)
                     {
+                        if (skill == null)
+                        {
+                            // Only log warning once, not every frame
+                            // UnityEngine.Debug.LogWarning($"{unit.UnitName}: Equipment item {item.ItemName} has a null skill in GrantedSkills!");
+                            continue;
+                        }
+                        
                         if (!available.Contains(skill))
+                        {
                             available.Add(skill);
+                            // Debug logging removed - was causing spam when called every frame
+                            // UnityEngine.Debug.Log($"{unit.UnitName}: Added skill '{skill.SkillName}' from equipment {item.ItemName}");
+                        }
                     }
                 }
             }
+
+            // Only log when skills actually change (not every frame)
+            // Debug logging moved to only log when skills are first added/removed
+            // UnityEngine.Debug.Log($"{unit.UnitName}: Total available skills: {available.Count}");
 
             return available;
         }
@@ -263,6 +292,27 @@ namespace Riftbourne.Characters
             }
             
             return totalBonus;
+        }
+
+        /// <summary>
+        /// Gets the total range bonus from equipped ranged weapons.
+        /// Only counts bonuses from items equipped in the RangedWeapon slot.
+        /// </summary>
+        public int GetRangedWeaponRangeBonus()
+        {
+            if (equippedItems.TryGetValue(EquipmentSlot.RangedWeapon, out EquipmentItem rangedWeapon) && rangedWeapon != null)
+            {
+                return rangedWeapon.RangeBonus;
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// Checks if the unit has a ranged weapon equipped.
+        /// </summary>
+        public bool HasRangedWeapon()
+        {
+            return equippedItems.ContainsKey(EquipmentSlot.RangedWeapon) && equippedItems[EquipmentSlot.RangedWeapon] != null;
         }
 
         public List<PassiveSkill> GetAvailablePassiveSkills()

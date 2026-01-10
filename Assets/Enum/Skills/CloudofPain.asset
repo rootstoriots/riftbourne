@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b8ae4acd9898594c9ce700a3aafb268, type: 3}
+  m_Name: CloudofPain
+  m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Skills.Skill
+  skillName: Cloud of Pain
+  tier: 1
+  description: Skill description
+  requiredMantle: 0
+  minimumLevel: 1
+  masteryCost: 0
+  baseDamage: 0
+  damageScaling: 0
+  scalingMultiplier: 1
+  appliesStatusEffect: 1
+  statusEffectData: {fileID: 11400000, guid: 6863964a75965eb42b664b14a3204f46, type: 2}
+  statusEffectDurationOverride: 3
+  stunChance: 33.3
+  stunDuration: 1
+  stunStatusEffectData: {fileID: 11400000, guid: 709af157d084ca7419d1c984cb622d62, type: 2}
+  appliesBurn: 0
+  burnDuration: 3
+  burnDamagePerTurn: 5
+  createsGroundHazard: 1
+  hazardData: {fileID: 0}
+  hazardDuration: 3
+  hazardDamagePerTurn: 6
+  range: 2
+  requiresLineOfSight: 1
+  aoeType: 1
+  aoePattern: 4
+  aoeSize: 2
+  icon: {fileID: 21300000, guid: 5c8bc766719296e44834e410eb33e65d, type: 3}

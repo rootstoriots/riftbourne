@@ -372,10 +372,18 @@ namespace Riftbourne.UI
             imageObj.transform.SetParent(container.transform, false);
             portrait.portraitImage = imageObj.AddComponent<Image>();
 
-            if (unit.IsPlayerControlled)
-                portrait.portraitImage.sprite = PortraitGenerator.GetPlayerPortrait();
+            // Use unit's portrait if assigned, otherwise fallback to PortraitGenerator
+            if (unit.Portrait != null)
+            {
+                portrait.portraitImage.sprite = unit.Portrait;
+            }
             else
-                portrait.portraitImage.sprite = PortraitGenerator.GetEnemyPortrait();
+            {
+                if (unit.IsPlayerControlled)
+                    portrait.portraitImage.sprite = PortraitGenerator.GetPlayerPortrait();
+                else
+                    portrait.portraitImage.sprite = PortraitGenerator.GetEnemyPortrait();
+            }
 
             RectTransform imageRect = imageObj.GetComponent<RectTransform>();
             imageRect.anchorMin = new Vector2(0.5f, 1f);

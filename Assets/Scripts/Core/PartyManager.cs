@@ -21,6 +21,10 @@ namespace Riftbourne.Core
         [SerializeField] private ObjectPool selectionRingPool;
         private GameObject currentSelectionRing;
 
+        [Header("Audio")]
+        [SerializeField] private AudioSource audioSource;
+        [SerializeField] private AudioClip unitSelectionSound;
+
         public Unit SelectedUnit => selectedUnit;
 
         private TurnManager turnManager;
@@ -36,6 +40,17 @@ namespace Riftbourne.Core
 
             Instance = this;
             turnManager = ManagerRegistry.Get<TurnManager>();
+
+            // Initialize audio source if not assigned
+            if (audioSource == null)
+            {
+                audioSource = GetComponent<AudioSource>();
+                if (audioSource == null)
+                {
+                    audioSource = gameObject.AddComponent<AudioSource>();
+                    audioSource.playOnAwake = false;
+                }
+            }
         }
 
         private void Start()
@@ -76,6 +91,9 @@ namespace Riftbourne.Core
 
             selectedUnit = unit;
             Debug.Log($"PartyManager: Selected {unit.UnitName}");
+
+            // Play unit selection sound
+            PlayUnitSelectionSound();
 
             UpdateSelectionRing();
         }
@@ -210,6 +228,17 @@ namespace Riftbourne.Core
 
             // Remove collider
             Destroy(currentSelectionRing.GetComponent<Collider>());
+        }
+
+        /// <summary>
+        /// Play unit selection sound effect.
+        /// </summary>
+        private void PlayUnitSelectionSound()
+        {
+            if (audioSource != null && unitSelectionSound != null)
+            {
+                audioSource.PlayOneShot(unitSelectionSound);
+            }
         }
     }
 }

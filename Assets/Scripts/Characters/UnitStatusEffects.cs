@@ -169,6 +169,85 @@ namespace Riftbourne.Characters
         {
             return new Dictionary<StatusEffectData, StatusEffect>(activeEffects);
         }
+
+        /// <summary>
+        /// Get total hit chance modifier from all active status effects.
+        /// </summary>
+        public float GetTotalHitChanceModifier()
+        {
+            float total = 0f;
+            foreach (var effect in activeEffects.Values)
+            {
+                if (effect != null && effect.Data != null && !effect.IsExpired)
+                {
+                    total += effect.Data.HitChanceModifier;
+                }
+            }
+            return total;
+        }
+
+        /// <summary>
+        /// Get total critical hit chance modifier from all active status effects.
+        /// </summary>
+        public float GetTotalCritChanceModifier()
+        {
+            float total = 0f;
+            foreach (var effect in activeEffects.Values)
+            {
+                if (effect != null && effect.Data != null && !effect.IsExpired)
+                {
+                    total += effect.Data.CritChanceModifier;
+                }
+            }
+            return total;
+        }
+
+        /// <summary>
+        /// Get total parry chance modifier from all active status effects.
+        /// </summary>
+        public float GetTotalParryChanceModifier()
+        {
+            float total = 0f;
+            foreach (var effect in activeEffects.Values)
+            {
+                if (effect != null && effect.Data != null && !effect.IsExpired)
+                {
+                    total += effect.Data.ParryChanceModifier;
+                }
+            }
+            return total;
+        }
+
+        /// <summary>
+        /// Get total critical defense modifier from all active status effects.
+        /// </summary>
+        public float GetTotalCritDefenseModifier()
+        {
+            float total = 0f;
+            foreach (var effect in activeEffects.Values)
+            {
+                if (effect != null && effect.Data != null && !effect.IsExpired)
+                {
+                    total += effect.Data.CritDefenseModifier;
+                }
+            }
+            return total;
+        }
+
+        /// <summary>
+        /// Check if the unit is stunned (has any status effect that prevents actions).
+        /// </summary>
+        public bool IsStunned()
+        {
+            foreach (var effect in activeEffects.Values)
+            {
+                if (effect != null && !effect.IsExpired && effect.PreventsActions())
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 }
 

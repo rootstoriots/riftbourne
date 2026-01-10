@@ -38,6 +38,19 @@ namespace Riftbourne.Combat
         [Tooltip("Does this effect prevent movement?")]
         [SerializeField] private bool preventsMovement = false;
 
+        [Header("Combat Stat Modifiers")]
+        [Tooltip("Hit chance modifier (percentage, e.g., -20 = -20% hit chance, +10 = +10% hit chance)")]
+        [SerializeField] private float hitChanceModifier = 0f;
+        
+        [Tooltip("Critical hit chance modifier (percentage, e.g., -10 = -10% crit chance, +15 = +15% crit chance)")]
+        [SerializeField] private float critChanceModifier = 0f;
+        
+        [Tooltip("Parry chance modifier (percentage, e.g., -5 = -5% parry chance, +10 = +10% parry chance)")]
+        [SerializeField] private float parryChanceModifier = 0f;
+        
+        [Tooltip("Critical defense modifier (percentage, e.g., -10 = -10% crit defense, +20 = +20% crit defense)")]
+        [SerializeField] private float critDefenseModifier = 0f;
+
         [Header("Visual/UI")]
         [Tooltip("Color for UI display of this status effect")]
         [SerializeField] private Color displayColor = Color.red;
@@ -55,6 +68,10 @@ namespace Riftbourne.Combat
         public float MovementMultiplier => movementMultiplier;
         public bool PreventsActions => preventsActions;
         public bool PreventsMovement => preventsMovement;
+        public float HitChanceModifier => hitChanceModifier;
+        public float CritChanceModifier => critChanceModifier;
+        public float ParryChanceModifier => parryChanceModifier;
+        public float CritDefenseModifier => critDefenseModifier;
         public Color DisplayColor => displayColor;
         public Sprite Icon => icon;
     }

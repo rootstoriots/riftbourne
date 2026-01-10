@@ -59,6 +59,17 @@ namespace Riftbourne.Characters
         }
 
         /// <summary>
+        /// Take pre-calculated damage (defense already applied).
+        /// Used when damage has been calculated by CombatCalculator.
+        /// </summary>
+        public int TakeDamageDirect(int finalDamage)
+        {
+            currentHP -= finalDamage;
+            currentHP = Mathf.Max(0, currentHP);
+            return finalDamage;
+        }
+
+        /// <summary>
         /// Heal this unit by a specified amount.
         /// Returns the actual amount healed (may be less than requested if at max HP).
         /// </summary>

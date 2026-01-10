@@ -17,9 +17,26 @@ MonoBehaviour:
   description: A bolt of fire that burns the target. Tier 1 Pyromancy
   requiredMantle: 1
   minimumLevel: 1
+  masteryCost: 3
   baseDamage: 15
+  damageScaling: 0
+  scalingMultiplier: 1
+  appliesStatusEffect: 0
+  statusEffectData: {fileID: 0}
+  statusEffectDurationOverride: 0
+  stunChance: 0
+  stunDuration: 1
+  stunStatusEffectData: {fileID: 0}
   appliesBurn: 1
   burnDuration: 3
   burnDamagePerTurn: 5
+  createsGroundHazard: 0
+  hazardData: {fileID: 0}
+  hazardDuration: 3
+  hazardDamagePerTurn: 5
   range: 3
   requiresLineOfSight: 1
+  aoeType: 0
+  aoePattern: 0
+  aoeSize: 0
+  icon: {fileID: 21300000, guid: b0c68c2ccdf172f49bd5ec26cc06a792, type: 3}

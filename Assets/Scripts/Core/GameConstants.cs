@@ -27,6 +27,34 @@ namespace Riftbourne.Core
         [Header("Combat System")]
         [Tooltip("Minimum damage that can be dealt (damage cannot be reduced below this)")]
         [SerializeField] private int minimumDamage = 1;
+        
+        [Tooltip("Base hit chance percentage (default accuracy)")]
+        [SerializeField] private float baseHitChance = 90f;
+        
+        [Tooltip("Base critical hit chance percentage")]
+        [SerializeField] private float baseCritChance = 5f;
+        
+        [Tooltip("Base parry chance percentage")]
+        [SerializeField] private float baseParryChance = 5f;
+        
+        [Tooltip("Base critical defense percentage")]
+        [SerializeField] private float baseCritDefense = 10f;
+        
+        [Tooltip("Critical hit damage multiplier (e.g., 1.5 = 150% damage)")]
+        [SerializeField] private float criticalHitMultiplier = 1.5f;
+        
+        [Header("Stat Scaling for Combat")]
+        [Tooltip("Hit chance bonus per point of Finesse")]
+        [SerializeField] private float finesseHitChancePerPoint = 1f;
+        
+        [Tooltip("Critical hit chance bonus per point of Luck")]
+        [SerializeField] private float luckCritChancePerPoint = 0.5f;
+        
+        [Tooltip("Parry chance bonus per point of Finesse")]
+        [SerializeField] private float finesseParryChancePerPoint = 0.5f;
+        
+        [Tooltip("Critical defense bonus per point of Focus")]
+        [SerializeField] private float focusCritDefensePerPoint = 0.5f;
 
         // Public properties
         public int BaseActionXP => baseActionXP;
@@ -34,6 +62,15 @@ namespace Riftbourne.Core
         public int ActionsPerSP => actionsPerSP;
         public int StatsPerLevel => statsPerLevel;
         public int MinimumDamage => minimumDamage;
+        public float BaseHitChance => baseHitChance;
+        public float BaseCritChance => baseCritChance;
+        public float BaseParryChance => baseParryChance;
+        public float BaseCritDefense => baseCritDefense;
+        public float CriticalHitMultiplier => criticalHitMultiplier;
+        public float FinesseHitChancePerPoint => finesseHitChancePerPoint;
+        public float LuckCritChancePerPoint => luckCritChancePerPoint;
+        public float FinesseParryChancePerPoint => finesseParryChancePerPoint;
+        public float FocusCritDefensePerPoint => focusCritDefensePerPoint;
 
         // Singleton instance (set via Resources or direct reference)
         private static GameConstants _instance;

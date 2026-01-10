@@ -22,11 +22,22 @@ MonoBehaviour:
   baseDamage: 0
   damageScaling: 0
   scalingMultiplier: 1
+  appliesStatusEffect: 0
+  statusEffectData: {fileID: 0}
+  statusEffectDurationOverride: 0
+  stunChance: 0
+  stunDuration: 1
+  stunStatusEffectData: {fileID: 0}
   appliesBurn: 1
   burnDuration: 3
   burnDamagePerTurn: 5
   createsGroundHazard: 1
+  hazardData: {fileID: 0}
   hazardDuration: 3
   hazardDamagePerTurn: 5
   range: 3
   requiresLineOfSight: 1
+  aoeType: 0
+  aoePattern: 0
+  aoeSize: 0
+  icon: {fileID: 21300000, guid: 83bee6a6548df304c91a20a8d66d9202, type: 3}
