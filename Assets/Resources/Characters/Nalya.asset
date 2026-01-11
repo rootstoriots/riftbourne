@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e117535b8465c664daa059fbe256186e, type: 3}
+  m_Name: Nalya
+  m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Characters.CharacterDefinition
+  characterID: char_nalya
+  characterName: Nalya
+  fullName: Nalya dels Avirne el Ruus
+  title: Lady-Captain of Halen
+  portrait: {fileID: 21300000, guid: 0f99f389a36044b4d8e7b0917fd031f5, type: 3}
+  bio: A young noblewoman hailing from the Kingdom of Halen.
+  baseStrength: 5
+  baseFinesse: 5
+  baseFocus: 5
+  baseSpeed: 5
+  baseLuck: 5
+  basePerception: 5
+  baseInterpretive: 3
+  baseEmpathic: 4
+  mantle: 0
+  availableSkills: []
+  startingEquipment:
+  - {fileID: 11400000, guid: 48cdfc6920a2ce649b309ba8a42cb259, type: 2}
+  isPOVCharacter: 1
+  availableChapters:
+  - Chapter001
+  narrativeTracks:
+  - Track001
+  requiredChapters: []
+  joinChapter: Chapter001
+  leaveChapter: 

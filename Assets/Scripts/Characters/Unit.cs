@@ -71,6 +71,8 @@ namespace Riftbourne.Characters
         // SP progression tracking
         private int lastSPAwardedAtAction = 0;  // Track when we last awarded SP
 
+        // Narrative skills for exploration mode
+        private Dictionary<Skills.NarrativeSkillCategory, int> narrativeSkills = new Dictionary<Skills.NarrativeSkillCategory, int>();
 
         // Equipment system
         private Dictionary<EquipmentSlot, EquipmentItem> equippedItems = new Dictionary<EquipmentSlot, EquipmentItem>();
@@ -85,9 +87,11 @@ namespace Riftbourne.Characters
         private UnitProgression unitProgression;
         private UnitEquipment unitEquipment;
         private UnitStatusEffects unitStatusEffects;
+        private WeaponProficiencyManager weaponProficiencyManager;
         
         // Public access to component classes
         public UnitEquipment UnitEquipment => unitEquipment;
+        public WeaponProficiencyManager WeaponProficiencyManager => weaponProficiencyManager;
 
         // Events
         /// <summary>
@@ -261,6 +265,15 @@ namespace Riftbourne.Characters
             unitProgression = new UnitProgression(this, level, currentXP, skillPoints, masteredSkills, masteredPassiveSkills);
             unitEquipment = new UnitEquipment(this, masteredSkills, masteredPassiveSkills, knownSkills);
             unitStatusEffects = new UnitStatusEffects(this);
+            weaponProficiencyManager = new WeaponProficiencyManager(this);
+            
+            // Initialize all weapon families so they show up in UI from the start
+            weaponProficiencyManager.InitializeAllFamilies();
+            
+            // Initialize narrative skills with default values
+            narrativeSkills[Skills.NarrativeSkillCategory.Perception] = 5;
+            narrativeSkills[Skills.NarrativeSkillCategory.Interpretive] = 3;
+            narrativeSkills[Skills.NarrativeSkillCategory.Empathic] = 4;
         }
         
         /// <summary>
@@ -1048,30 +1061,14 @@ namespace Riftbourne.Characters
         /// <summary>
         /// Award XP to this unit and handle leveling up.
         /// </summary>
+        /// <summary>
+        /// Deprecated: XP system has been replaced with weapon proficiency system.
+        /// This method is kept for backward compatibility but does nothing.
+        /// </summary>
+        [System.Obsolete("XP system has been replaced with weapon proficiency system. Use proficiency tracking instead.")]
         public void AwardXP(int amount)
         {
-            if (unitProgression != null)
-            {
-                unitProgression.AwardXP(amount, (newLevel) => {
-                    level = newLevel;
-                    // Random stat increases on level up
-                    int statsToAllocate = GameConstants.Instance != null ? GameConstants.Instance.StatsPerLevel : 2;
-                    for (int i = 0; i < statsToAllocate; i++)
-                    {
-                        int randomStat = UnityEngine.Random.Range(0, 5);
-                        switch (randomStat)
-                        {
-                            case 0: unitStats?.IncreaseStrength(1); strength++; Debug.Log($"{unitName} Strength +1"); break;
-                            case 1: unitStats?.IncreaseFinesse(1); finesse++; Debug.Log($"{unitName} Finesse +1"); break;
-                            case 2: unitStats?.IncreaseFocus(1); focus++; Debug.Log($"{unitName} Focus +1"); break;
-                            case 3: unitStats?.IncreaseSpeed(1); speed++; Debug.Log($"{unitName} Speed +1"); break;
-                            case 4: unitStats?.IncreaseLuck(1); luck++; Debug.Log($"{unitName} Luck +1"); break;
-                        }
-                    }
-                });
-                currentXP = unitProgression.CurrentXP;
-                level = unitProgression.Level;
-            }
+            // No-op: XP system removed in favor of weapon proficiency system
         }
         
         /// <summary>
@@ -1131,6 +1128,197 @@ namespace Riftbourne.Characters
             return unitEquipment?.GetAvailablePassiveSkills() ?? new List<PassiveSkill>();
         }
         
+        #endregion
+        
+        #region Narrative Skills
+        
+        /// <summary>
+        /// Get the narrative skill level for a specific category.
+        /// </summary>
+        public int GetNarrativeSkillLevel(Skills.NarrativeSkillCategory category)
+        {
+            if (narrativeSkills.ContainsKey(category))
+            {
+                return narrativeSkills[category];
+            }
+            return 0;
+        }
+        
+        /// <summary>
+        /// Get all narrative skills as a dictionary.
+        /// </summary>
+        public Dictionary<Skills.NarrativeSkillCategory, int> NarrativeSkills => new Dictionary<Skills.NarrativeSkillCategory, int>(narrativeSkills);
+        
+        #endregion
+
+        #region CharacterState Integration
+
+        [Header("Character State (Runtime)")]
+        [Tooltip("Reference to CharacterState this Unit represents (for battle mode)")]
+        [SerializeField] private CharacterState characterState;
+
+        /// <summary>
+        /// Get the CharacterState this Unit represents.
+        /// </summary>
+        public CharacterState CharacterState => characterState;
+
+        /// <summary>
+        /// Update Unit from CharacterState (for battle initialization).
+        /// Syncs all stats, equipment, skills, and progression.
+        /// </summary>
+        public void UpdateFromCharacterState(CharacterState state)
+        {
+            if (state == null)
+            {
+                Debug.LogWarning($"Unit {unitName}: Cannot update from null CharacterState!");
+                return;
+            }
+
+            characterState = state;
+
+            // Update basic info
+            if (state.Definition != null)
+            {
+                unitName = state.Definition.CharacterName;
+                portrait = state.Definition.Portrait;
+                mantle = state.Definition.Mantle;
+            }
+
+            // Update stats (set base stats, equipment will add bonuses)
+            strength = state.CurrentStrength;
+            finesse = state.CurrentFinesse;
+            focus = state.CurrentFocus;
+            speed = state.CurrentSpeed;
+            luck = state.CurrentLuck;
+
+            // Update UnitStats component if it exists
+            if (unitStats != null)
+            {
+                unitStats.SetStrength(strength);
+                unitStats.SetFinesse(finesse);
+                unitStats.SetFocus(focus);
+                unitStats.SetSpeed(speed);
+                unitStats.SetLuck(luck);
+            }
+
+            // Update HP
+            maxHP = state.MaxHP;
+            currentHP = state.CurrentHP;
+            if (unitCombat != null)
+            {
+                unitCombat.SetHP(currentHP, maxHP);
+            }
+
+            // Update progression
+            level = state.Level;
+            currentXP = state.CurrentXP;
+            skillPoints = state.SkillPoints;
+            totalActions = state.TotalActions;
+
+            // Update weapon proficiencies
+            if (weaponProficiencyManager != null && state.WeaponProficiencies != null)
+            {
+                Dictionary<WeaponFamily, WeaponProficiency> proficiencyData = new Dictionary<WeaponFamily, WeaponProficiency>();
+                foreach (var kvp in state.WeaponProficiencies)
+                {
+                    proficiencyData[kvp.Key] = kvp.Value;
+                }
+                weaponProficiencyManager.InitializeFromData(proficiencyData);
+            }
+
+            // Update UnitProgression component if it exists
+            if (unitProgression != null)
+            {
+                // Note: UnitProgression doesn't have setters, so we'll need to sync through reflection or recreate
+                // For now, the serialized fields are updated above
+            }
+
+            // Update equipment
+            if (unitEquipment != null)
+            {
+                // Clear existing equipment
+                foreach (var slot in System.Enum.GetValues(typeof(EquipmentSlot)).Cast<EquipmentSlot>())
+                {
+                    unitEquipment.UnequipItem(slot);
+                }
+
+                // Equip items from CharacterState
+                foreach (var kvp in state.EquippedItems)
+                {
+                    unitEquipment.EquipItem(kvp.Value, kvp.Key);
+                }
+            }
+            else
+            {
+                // Set serialized equipment fields directly
+                meleeWeapon = state.GetEquippedItem(EquipmentSlot.MeleeWeapon);
+                rangedWeapon = state.GetEquippedItem(EquipmentSlot.RangedWeapon);
+                armor = state.GetEquippedItem(EquipmentSlot.Armor);
+                accessory1 = state.GetEquippedItem(EquipmentSlot.Accessory1);
+                accessory2 = state.GetEquippedItem(EquipmentSlot.Accessory2);
+                codex = state.GetEquippedItem(EquipmentSlot.Codex);
+            }
+
+            // Update known skills
+            knownSkills.Clear();
+            knownSkills.AddRange(state.GetAvailableSkills());
+
+            // Update mastered skills (sync with UnitProgression)
+            if (unitProgression != null)
+            {
+                // Clear existing mastered skills
+                var masteredSkillsSet = unitProgression.MasteredSkills;
+                masteredSkillsSet.Clear();
+
+                // Add mastered skills from CharacterState
+                foreach (var skill in state.MasteredSkills)
+                {
+                    masteredSkillsSet.Add(skill);
+                }
+
+                // Update mastered passive skills
+                var masteredPassivesSet = unitProgression.MasteredPassiveSkills;
+                masteredPassivesSet.Clear();
+                foreach (var passive in state.MasteredPassiveSkills)
+                {
+                    masteredPassivesSet.Add(passive);
+                }
+            }
+
+            // Update narrative skills
+            narrativeSkills[Skills.NarrativeSkillCategory.Perception] = state.CurrentPerception;
+            narrativeSkills[Skills.NarrativeSkillCategory.Interpretive] = state.CurrentInterpretive;
+            narrativeSkills[Skills.NarrativeSkillCategory.Empathic] = state.CurrentEmpathic;
+
+            // Update status effects (apply from CharacterState)
+            if (unitStatusEffects != null)
+            {
+                // Clear existing status effects
+                // Note: UnitStatusEffects doesn't have a clear method, so we'll need to handle this
+                // For now, status effects will be applied as they occur in battle
+            }
+
+            Debug.Log($"Unit {unitName}: Updated from CharacterState {state.CharacterID}");
+        }
+
+        /// <summary>
+        /// Export Unit state back to CharacterState (for battle → exploration transition).
+        /// Updates CharacterState with current Unit values.
+        /// </summary>
+        public void ExportToCharacterState(CharacterState state)
+        {
+            if (state == null)
+            {
+                Debug.LogWarning($"Unit {unitName}: Cannot export to null CharacterState!");
+                return;
+            }
+
+            // Update CharacterState from Unit
+            state.UpdateFromUnit(this);
+
+            Debug.Log($"Unit {unitName}: Exported state to CharacterState {state.CharacterID}");
+        }
+
         #endregion
     }
 }

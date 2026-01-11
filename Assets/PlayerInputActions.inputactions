@@ -50,6 +50,33 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "Journal",
+                    "type": "Button",
+                    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "StatusMenu",
+                    "type": "Button",
+                    "id": "b2c3d4e5-f6a7-8901-bcde-f23456789012",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "Quicksave",
+                    "type": "Button",
+                    "id": "q1w2e3r4-t5y6-u7i8-o9p0-asdfghjklzxc",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -160,6 +187,39 @@
                     "processors": "",
                     "groups": "Keyboard&Mouse",
                     "action": "Sprint",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "j1k2l3m4-n5o6-p7q8-rst9-uvwxyz012345",
+                    "path": "<Keyboard>/j",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Journal",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "t1a2b3c4-d5e6-f7g8-hij9-klmnopqrst01",
+                    "path": "<Keyboard>/tab",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "StatusMenu",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "f5q1w2e3-r4t5-y6u7-i8o9-p0asdfghjkl",
+                    "path": "<Keyboard>/f5",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "Keyboard&Mouse",
+                    "action": "Quicksave",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

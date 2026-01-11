@@ -1,11 +1,15 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Riftbourne.Core;
+using Riftbourne.Characters;
+using Riftbourne.Skills;
 
 namespace Riftbourne.Exploration
 {
     /// <summary>
     /// Handles free 3D movement using CharacterController with WASD controls.
     /// Movement is relative to camera direction, supports sprint, gravity, and ground detection.
+    /// Uses POV character's narrative skills for exploration checks.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
     public class ExplorationController : MonoBehaviour
@@ -26,6 +30,7 @@ namespace Riftbourne.Exploration
         
         [Header("References")]
         [SerializeField] private Transform cameraTransform;
+        [SerializeField] private BattleSceneLoader battleSceneLoader; // Optional: assign manually, or will be found automatically
         
         [Header("Debug")]
         [SerializeField] private bool showDebugInfo = true;
@@ -55,11 +60,57 @@ namespace Riftbourne.Exploration
         public bool IsSprinting => isSprinting;
         public float CurrentSpeed => currentSpeed;
         public Vector3 Velocity => velocity;
+
+        /// <summary>
+        /// Get the POV character's narrative skill level for a category.
+        /// Used by exploration systems for skill checks.
+        /// </summary>
+        public int GetPOVNarrativeSkillLevel(NarrativeSkillCategory category)
+        {
+            if (PartyManager.Instance == null)
+            {
+                return 0;
+            }
+
+            CharacterState povCharacter = PartyManager.Instance.POVCharacter;
+            if (povCharacter == null)
+            {
+                return 0;
+            }
+
+            return povCharacter.GetNarrativeSkillLevel(category);
+        }
+
+        /// <summary>
+        /// Get the POV character.
+        /// </summary>
+        public CharacterState GetPOVCharacter()
+        {
+            if (PartyManager.Instance == null)
+            {
+                return null;
+            }
+
+            return PartyManager.Instance.POVCharacter;
+        }
+
+        /// <summary>
+        /// Check if POV character's narrative skill meets a threshold.
+        /// </summary>
+        public bool CheckNarrativeSkill(NarrativeSkillCategory category, int requiredLevel)
+        {
+            int skillLevel = GetPOVNarrativeSkillLevel(category);
+            return skillLevel >= requiredLevel;
+        }
         
         private void Awake()
         {
             characterController = GetComponent<CharacterController>();
             inputActions = new PlayerInputActions();
+            
+            // Restore position IMMEDIATELY in Awake (before player is visible)
+            // This prevents the player from appearing at spawn location first
+            RestorePositionIfReturningFromBattle();
             
             // If no camera transform assigned, try to find main camera
             if (cameraTransform == null)
@@ -70,6 +121,41 @@ namespace Riftbourne.Exploration
                     cameraTransform = mainCam.transform;
                 }
             }
+            
+            // Find BattleSceneLoader if not assigned
+            if (battleSceneLoader == null)
+            {
+                battleSceneLoader = FindFirstObjectByType<BattleSceneLoader>();
+                if (battleSceneLoader == null)
+                {
+                    Debug.LogWarning("ExplorationController: No BattleSceneLoader found in scene. F2 battle trigger will not work. Add BattleSceneLoader component to a GameObject in the exploration scene.");
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Restore position immediately in Awake if returning from battle.
+        /// This prevents the player from appearing at spawn location first.
+        /// </summary>
+        private void RestorePositionIfReturningFromBattle()
+        {
+            if (SceneTransitionData.Instance == null)
+            {
+                return; // No saved data, first load
+            }
+            
+            Vector3 savedPosition = SceneTransitionData.Instance.ExplorationPosition;
+            if (savedPosition == Vector3.zero)
+            {
+                return; // No saved position, first load
+            }
+            
+            // Set position immediately before player is visible
+            transform.position = savedPosition;
+            Debug.Log($"[POSITION RESTORE] ExplorationController: Restored position in Awake: {savedPosition} (X:{savedPosition.x:F2}, Y:{savedPosition.y:F2}, Z:{savedPosition.z:F2})");
+            
+            // Clear the saved position so it doesn't interfere with future loads
+            SceneTransitionData.Instance.ExplorationPosition = Vector3.zero;
         }
         
         private void OnEnable()
@@ -110,6 +196,12 @@ namespace Riftbourne.Exploration
             {
                 HandleLeftClick();
             }
+            
+            // Handle F2 key for battle trigger
+            if (Keyboard.current != null && Keyboard.current.f2Key.wasPressedThisFrame)
+            {
+                HandleBattleTrigger();
+            }
         }
         
         private void HandleLeftClick()
@@ -143,6 +235,41 @@ namespace Riftbourne.Exploration
                 hasClickTarget = true;
                 Debug.Log($"Click-to-move target set: {hit.point} (hit {hit.collider.name})");
             }
+        }
+        
+        /// <summary>
+        /// Handle F2 key press to trigger battle.
+        /// </summary>
+        private void HandleBattleTrigger()
+        {
+            // Try to find BattleSceneLoader if not assigned
+            if (battleSceneLoader == null)
+            {
+                battleSceneLoader = FindFirstObjectByType<BattleSceneLoader>();
+            }
+            
+            if (battleSceneLoader == null)
+            {
+                Debug.LogWarning("ExplorationController: Cannot trigger battle - BattleSceneLoader not found! Add BattleSceneLoader component to a GameObject in the exploration scene.");
+                return;
+            }
+            
+            // Check if party exists
+            if (PartyManager.Instance == null)
+            {
+                Debug.LogWarning("ExplorationController: Cannot trigger battle - PartyManager not available!");
+                return;
+            }
+            
+            var party = PartyManager.Instance.GetPartyMembers();
+            if (party == null || party.Count == 0)
+            {
+                Debug.LogWarning("ExplorationController: Cannot trigger battle - No party members!");
+                return;
+            }
+            
+            Debug.Log($"ExplorationController: F2 pressed - Triggering battle with {party.Count} party members");
+            battleSceneLoader.LoadBattleScene();
         }
         
         private void HandleClickToMove()

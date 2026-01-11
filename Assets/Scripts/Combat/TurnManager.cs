@@ -94,6 +94,9 @@ namespace Riftbourne.Combat
 
         private void OnDestroy()
         {
+            // Unsubscribe from events
+            GameEvents.OnUnitDied -= HandleUnitDied;
+            
             // Cancel any running enemy window coroutine
             if (currentEnemyWindowCoroutine != null)
             {
@@ -116,10 +119,149 @@ namespace Riftbourne.Combat
                 }
             }
             
+            // Subscribe to unit death events
+            GameEvents.OnUnitDied += HandleUnitDied;
+            
             // Ensure all factions are registered before initializing combat
             RegisterAllFactionsFromUnits();
             
-            InitializeCombat();
+            // Delay combat initialization to ensure all units are fully created and initialized
+            // This is especially important when units are created dynamically (e.g., from CharacterState)
+            // Wait one frame to allow BattleSceneInitializer and unit Start() methods to complete
+            StartCoroutine(DelayedCombatInitialization());
+        }
+        
+        /// <summary>
+        /// Delay combat initialization to ensure all units are fully created and initialized.
+        /// This fixes issues where units created from CharacterState aren't ready when TurnManager initializes.
+        /// </summary>
+        private System.Collections.IEnumerator DelayedCombatInitialization()
+        {
+            // Wait multiple frames to ensure all Start() methods have run and units have registered themselves
+            yield return null;
+            yield return null;
+            
+            // Additional delay to ensure unit components (unitStats, unitEquipment) are fully initialized
+            yield return new WaitForSeconds(0.2f);
+            
+            // Check if units have registered themselves - if so, use that list
+            // Otherwise, find units manually
+            if (allUnits.Count == 0)
+            {
+                Debug.Log("TurnManager: No units registered yet, finding units manually...");
+                InitializeCombat();
+            }
+            else
+            {
+                Debug.Log($"TurnManager: {allUnits.Count} units already registered. Re-sorting by speed...");
+                // Re-sort the registered units to ensure correct order
+                ReSortUnitsBySpeed();
+                // Initialize combat with the registered units
+                FinalizeCombatInitialization();
+            }
+        }
+        
+        /// <summary>
+        /// Handle unit death - check for victory if enemy died.
+        /// </summary>
+        private void HandleUnitDied(Unit unit)
+        {
+            if (unit == null) return;
+            
+            // If an enemy died, check if combat is over
+            if (unit.Faction != Faction.Player)
+            {
+                Debug.Log($"TurnManager: Enemy {unit.UnitName} died. Checking if combat is over...");
+                // Small delay to ensure unit is properly removed from lists
+                StartCoroutine(CheckCombatOverAfterDeath());
+            }
+        }
+        
+        /// <summary>
+        /// Coroutine to check if combat is over after a unit death.
+        /// Small delay ensures the unit is properly removed from lists before checking.
+        /// </summary>
+        private System.Collections.IEnumerator CheckCombatOverAfterDeath()
+        {
+            yield return new WaitForSeconds(0.1f);
+            IsCombatOver();
+        }
+        
+        /// <summary>
+        /// Re-sort all units by speed. Called after all units have registered themselves.
+        /// </summary>
+        private void ReSortUnitsBySpeed()
+        {
+            if (allUnits == null || allUnits.Count == 0) return;
+            
+            // Log unit speeds before sorting for debugging
+            Debug.Log($"TurnManager: Re-sorting {allUnits.Count} units by speed:");
+            foreach (var unit in allUnits)
+            {
+                int equipmentBonus = unit.UnitEquipment != null ? unit.UnitEquipment.GetTotalEquipmentBonus(StatType.Speed) : 0;
+                Debug.Log($"  - {unit.UnitName}: Speed = {unit.Speed} (Equipment bonus: {equipmentBonus})");
+            }
+            
+            // Sort by Speed (higher goes first)
+            // Tiebreaker: Player faction goes first if speed is tied
+            allUnits.Sort((a, b) =>
+            {
+                int speedA = a.Speed;
+                int speedB = b.Speed;
+                int speedCompare = speedB.CompareTo(speedA);
+                if (speedCompare != 0)
+                    return speedCompare;
+                // Tied speed - player faction goes first
+                if (a.Faction == Faction.Player && b.Faction != Faction.Player)
+                    return -1;
+                if (a.Faction != Faction.Player && b.Faction == Faction.Player)
+                    return 1;
+                return 0;
+            });
+            
+            Debug.Log($"TurnManager: Re-sorted turn order: {string.Join(", ", allUnits.Select(u => $"{u.UnitName}(Speed:{u.Speed})"))}");
+        }
+        
+        /// <summary>
+        /// Finalize combat initialization after units are sorted.
+        /// </summary>
+        private void FinalizeCombatInitialization()
+        {
+            combatInitialized = true;
+            
+            if (allUnits.Count > 0)
+            {
+                currentTurnIndex = 0;
+                CurrentUnit = allUnits[currentTurnIndex];
+
+                // Calculate initial turn window
+                CalculateTurnWindow();
+
+                Debug.Log($"Combat started! Turn window: {string.Join(", ", currentTurnWindow.Select(u => u.UnitName))}");
+
+                // Handle initial turn based on faction
+                if (currentTurnWindow.Count > 0)
+                {
+                    if (CurrentUnit.Faction == Faction.Player)
+                    {
+                        // Player turn - auto-select first unit
+                        if (PartyManager.Instance != null)
+                        {
+                            PartyManager.Instance.SelectUnit(CurrentUnit);
+                        }
+                        Debug.Log($"--- Player turn window: {string.Join(", ", currentTurnWindow.Select(u => u.UnitName))} ---");
+                    }
+                    else
+                    {
+                        // Enemy turn - execute AI
+                        ExecuteEnemyWindow();
+                    }
+                }
+            }
+            else
+            {
+                Debug.LogWarning("TurnManager: No units found in scene!");
+            }
         }
 
         /// <summary>
@@ -180,11 +322,21 @@ namespace Riftbourne.Combat
                 allUnits = new List<Unit>();
                 allUnits.AddRange(foundUnits);
 
+                // Log unit speeds before sorting for debugging
+                Debug.Log($"TurnManager: Found {allUnits.Count} units. Speeds before sorting:");
+                foreach (var unit in allUnits)
+                {
+                    int equipmentBonus = unit.UnitEquipment != null ? unit.UnitEquipment.GetTotalEquipmentBonus(StatType.Speed) : 0;
+                    Debug.Log($"  - {unit.UnitName}: Speed = {unit.Speed} (Equipment bonus: {equipmentBonus})");
+                }
+
                 // Sort by Speed (higher goes first)
                 // Tiebreaker: Player faction goes first if speed is tied
                 allUnits.Sort((a, b) =>
                 {
-                    int speedCompare = b.Speed.CompareTo(a.Speed);
+                    int speedA = a.Speed;
+                    int speedB = b.Speed;
+                    int speedCompare = speedB.CompareTo(speedA);
                     if (speedCompare != 0)
                         return speedCompare;
                     // Tied speed - player faction goes first
@@ -202,26 +354,7 @@ namespace Riftbourne.Combat
 
             Debug.Log($"TurnManager: Turn order: {string.Join(", ", allUnits.Select(u => $"{u.UnitName}(Speed:{u.Speed})"))}");
 
-            if (allUnits.Count > 0)
-            {
-                currentTurnIndex = 0;
-                CurrentUnit = allUnits[currentTurnIndex];
-
-                // Calculate initial turn window
-                CalculateTurnWindow();
-
-                Debug.Log($"Combat started! Turn window: {string.Join(", ", currentTurnWindow.Select(u => u.UnitName))}");
-
-                // Auto-select first player unit if it's in the window
-                if (CurrentUnit.Faction == Faction.Player && PartyManager.Instance != null)
-                {
-                    PartyManager.Instance.SelectUnit(CurrentUnit);
-                }
-            }
-            else
-            {
-                Debug.LogWarning("TurnManager: No units found in scene!");
-            }
+            FinalizeCombatInitialization();
         }
 
         /// <summary>
@@ -254,6 +387,8 @@ namespace Riftbourne.Combat
             }
         }
 
+        private bool combatInitialized = false;
+
         /// <summary>
         /// Register a unit that was created after TurnManager initialization.
         /// Prevents race conditions where units spawn after combat starts.
@@ -276,27 +411,22 @@ namespace Riftbourne.Combat
             // Add unit to the list
             allUnits.Add(unit);
 
-            // Re-sort by Speed to maintain turn order
-            allUnits.Sort((a, b) =>
-            {
-                int speedCompare = b.Speed.CompareTo(a.Speed);
-                if (speedCompare != 0)
-                    return speedCompare;
-                // Tied speed - player faction goes first
-                if (a.Faction == Faction.Player && b.Faction != Faction.Player)
-                    return -1;
-                if (a.Faction != Faction.Player && b.Faction == Faction.Player)
-                    return 1;
-                return 0;
-            });
+            Debug.Log($"TurnManager: Registered unit {unit.UnitName} (Speed: {unit.Speed}). Total units: {allUnits.Count}");
 
-            Debug.Log($"TurnManager: Registered late unit {unit.UnitName} (Speed: {unit.Speed})");
-
-            // If combat hasn't started yet or we're in a transition, recalculate window
-            if (currentTurnWindow.Count == 0)
+            // If combat hasn't been initialized yet, don't sort - wait for DelayedCombatInitialization
+            // If combat is already initialized, re-sort immediately
+            if (combatInitialized)
             {
-                CalculateTurnWindow();
+                // Re-sort by Speed to maintain turn order
+                ReSortUnitsBySpeed();
+                
+                // Recalculate window if needed
+                if (currentTurnWindow.Count == 0)
+                {
+                    CalculateTurnWindow();
+                }
             }
+            // Otherwise, DelayedCombatInitialization will handle the sorting
         }
 
         /// <summary>

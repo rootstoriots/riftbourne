@@ -82,8 +82,26 @@ namespace Riftbourne.Combat
                 return false;
             }
 
-            // Calculate combat result (hit/miss, parry, crit)
-            CombatCalculator.CombatResult result = CombatCalculator.CalculateAttack(attacker, target, attacker.AttackPower);
+            // Get weapon family and proficiency for this attack
+            WeaponFamily weaponFamily = WeaponFamily.None;
+            WeaponProficiencyTier? proficiencyTier = null;
+            
+            EquipmentItem meleeWeapon = attacker.UnitEquipment?.GetEquippedItem(EquipmentSlot.MeleeWeapon);
+            if (meleeWeapon != null)
+            {
+                weaponFamily = WeaponFamilyHelper.GetWeaponFamily(meleeWeapon);
+                if (weaponFamily != WeaponFamily.None && attacker.WeaponProficiencyManager != null)
+                {
+                    var proficiency = attacker.WeaponProficiencyManager.GetProficiency(weaponFamily);
+                    if (proficiency != null)
+                    {
+                        proficiencyTier = proficiency.CurrentTier;
+                    }
+                }
+            }
+
+            // Calculate combat result (hit/miss, parry, crit) with proficiency effects
+            CombatCalculator.CombatResult result = CombatCalculator.CalculateAttack(attacker, target, attacker.AttackPower, proficiencyTier);
             
             // Handle miss
             if (!result.Hit)
@@ -105,10 +123,8 @@ namespace Riftbourne.Combat
             if (result.Parried)
             {
                 Debug.Log($"{target.UnitName} parried {attacker.UnitName}'s attack!");
-                // Still record action and award XP for attempting attack
+                // Still record action for SP system
                 attacker.RecordAction();
-                int baseXP = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
-                attacker.AwardXP(baseXP);
                 attacker.MarkAsActed();
                 return true; // Attack was attempted, even if parried
             }
@@ -127,16 +143,15 @@ namespace Riftbourne.Combat
             }
             Debug.Log($"{attacker.UnitName} attacks {target.UnitName}! {damageMessage}!");
             
-            // Record action and award XP
-            attacker.RecordAction();  // Award SP based on action count
-            int baseXP2 = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
-            attacker.AwardXP(baseXP2);
-            
-            // Award bonus XP if target died
-            if (!target.IsAlive)
+            // Record action for SP system
+            attacker.RecordAction();
+
+            // Record combat outcome for proficiency advancement
+            if (weaponFamily != WeaponFamily.None && attacker.WeaponProficiencyManager != null)
             {
-                int killBonus = GameConstants.Instance != null ? GameConstants.Instance.KillBonusXP : 25;
-                attacker.AwardXP(killBonus);
+                bool wasKill = !target.IsAlive;
+                bool wasCrit = result.CriticalHit && !result.CriticalDefense;
+                attacker.WeaponProficiencyManager.RecordCombatAction(weaponFamily, result.Hit, wasKill, wasCrit, target);
             }
 
             // Mark attacker as acted (caller can still decide when to end turn)
@@ -188,8 +203,26 @@ namespace Riftbourne.Combat
                 return false;
             }
 
-            // Calculate combat result (hit/miss, parry, crit)
-            CombatCalculator.CombatResult result = CombatCalculator.CalculateAttack(attacker, target, attacker.AttackPower);
+            // Get weapon family and proficiency for this attack
+            WeaponFamily weaponFamily = WeaponFamily.None;
+            WeaponProficiencyTier? proficiencyTier = null;
+            
+            EquipmentItem rangedWeapon = attacker.UnitEquipment?.GetEquippedItem(EquipmentSlot.RangedWeapon);
+            if (rangedWeapon != null)
+            {
+                weaponFamily = WeaponFamilyHelper.GetWeaponFamily(rangedWeapon);
+                if (weaponFamily != WeaponFamily.None && attacker.WeaponProficiencyManager != null)
+                {
+                    var proficiency = attacker.WeaponProficiencyManager.GetProficiency(weaponFamily);
+                    if (proficiency != null)
+                    {
+                        proficiencyTier = proficiency.CurrentTier;
+                    }
+                }
+            }
+
+            // Calculate combat result (hit/miss, parry, crit) with proficiency effects
+            CombatCalculator.CombatResult result = CombatCalculator.CalculateAttack(attacker, target, attacker.AttackPower, proficiencyTier);
             
             // Handle miss
             if (!result.Hit)
@@ -199,10 +232,8 @@ namespace Riftbourne.Combat
                 // Raise event for UI to display "Missed!" on HP indicator
                 Riftbourne.Core.GameEvents.RaiseAttackMissed(target);
                 
-                // Still record action and award XP for attempting attack
+                // Still record action for SP system
                 attacker.RecordAction();
-                int baseXP = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
-                attacker.AwardXP(baseXP);
                 attacker.MarkAsActed();
                 return true; // Attack was attempted, even if it missed
             }
@@ -211,10 +242,8 @@ namespace Riftbourne.Combat
             if (result.Parried)
             {
                 Debug.Log($"{target.UnitName} parried {attacker.UnitName}'s ranged attack!");
-                // Still record action and award XP for attempting attack
+                // Still record action for SP system
                 attacker.RecordAction();
-                int baseXP = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
-                attacker.AwardXP(baseXP);
                 attacker.MarkAsActed();
                 return true; // Attack was attempted, even if parried
             }
@@ -233,16 +262,15 @@ namespace Riftbourne.Combat
             }
             Debug.Log($"{attacker.UnitName} performs ranged attack on {target.UnitName}! {damageMessage}!");
             
-            // Record action and award XP
-            attacker.RecordAction();  // Award SP based on action count
-            int baseXP2 = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
-            attacker.AwardXP(baseXP2);
-            
-            // Award bonus XP if target died
-            if (!target.IsAlive)
+            // Record action for SP system
+            attacker.RecordAction();
+
+            // Record combat outcome for proficiency advancement
+            if (weaponFamily != WeaponFamily.None && attacker.WeaponProficiencyManager != null)
             {
-                int killBonus = GameConstants.Instance != null ? GameConstants.Instance.KillBonusXP : 25;
-                attacker.AwardXP(killBonus);
+                bool wasKill = !target.IsAlive;
+                bool wasCrit = result.CriticalHit && !result.CriticalDefense;
+                attacker.WeaponProficiencyManager.RecordCombatAction(weaponFamily, result.Hit, wasKill, wasCrit, target);
             }
 
             // Mark attacker as acted (caller can still decide when to end turn)

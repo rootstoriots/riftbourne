@@ -1084,10 +1084,6 @@ namespace Riftbourne.UI
             string statusText = $"<b>{currentUnit.UnitName}</b> - Lv.{currentUnit.Level}\n";
             statusText += $"HP: {currentUnit.CurrentHP}/{currentUnit.MaxHP}";
             
-            // Show XP progress
-            int xpNeeded = currentUnit.GetXPRequiredForNextLevel();
-            statusText += $" | XP: {currentUnit.CurrentXP}/{xpNeeded}";
-            
             // Show SP if any
             if (currentUnit.SkillPoints > 0)
             {

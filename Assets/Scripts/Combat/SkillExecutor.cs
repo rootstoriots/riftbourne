@@ -91,28 +91,57 @@ namespace Riftbourne.Combat
 
             Debug.Log($"{user.UnitName} casts {skill.SkillName} on {target.UnitName}!");
 
+            // Get weapon family and proficiency for this skill
+            WeaponFamily weaponFamily = WeaponFamily.None;
+            WeaponProficiencyTier? proficiencyTier = null;
+            
+            // Determine weapon family from equipped weapon
+            EquipmentItem meleeWeapon = user.UnitEquipment?.GetEquippedItem(EquipmentSlot.MeleeWeapon);
+            EquipmentItem rangedWeapon = user.UnitEquipment?.GetEquippedItem(EquipmentSlot.RangedWeapon);
+            
+            if (meleeWeapon != null)
+            {
+                weaponFamily = WeaponFamilyHelper.GetWeaponFamily(meleeWeapon);
+            }
+            else if (rangedWeapon != null)
+            {
+                weaponFamily = WeaponFamilyHelper.GetWeaponFamily(rangedWeapon);
+            }
+            
+            if (weaponFamily != WeaponFamily.None && user.WeaponProficiencyManager != null)
+            {
+                var proficiency = user.WeaponProficiencyManager.GetProficiency(weaponFamily);
+                if (proficiency != null)
+                {
+                    proficiencyTier = proficiency.CurrentTier;
+                }
+            }
+
             // Check if this is an AOE skill
             if (skill.AOEType != AOEType.None && skill.AOEPattern != AOEPatternType.None)
             {
                 // Execute AOE skill - affects multiple targets
-                ExecuteAOESkill(skill, user, target.GridX, target.GridY, target);
+                ExecuteAOESkill(skill, user, target.GridX, target.GridY, target, proficiencyTier);
             }
             else
             {
                 // Single target skill - apply to target only
-                ApplySkillEffectsToTarget(skill, user, target);
+                ApplySkillEffectsToTarget(skill, user, target, proficiencyTier);
             }
 
-            // Record action and award XP
-            user.RecordAction();  // Award SP based on action count
-            int baseXP = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
-            user.AwardXP(baseXP);
-            
-            // Award bonus XP if target died
-            if (!target.IsAlive)
+            // Record action for SP system
+            user.RecordAction();
+
+            // Record combat outcome for proficiency advancement (if skill deals damage)
+            if (weaponFamily != WeaponFamily.None && user.WeaponProficiencyManager != null && skill.BaseDamage > 0)
             {
-                int killBonus = GameConstants.Instance != null ? GameConstants.Instance.KillBonusXP : 25;
-                user.AwardXP(killBonus);
+                bool wasAlive = target.IsAlive;
+                // Note: We can't determine if it was a crit from skill damage, so we'll use false
+                // In the future, we could track crits from skills if needed
+                bool wasHit = true; // Skills always "hit" if they execute
+                bool wasKill = wasAlive && !target.IsAlive;
+                bool wasCrit = false; // Skills don't currently have crit tracking
+                user.WeaponProficiencyManager.RecordCombatAction(weaponFamily, wasHit, wasKill, wasCrit, target);
             }
 
             // Mark that user has acted this turn
@@ -193,10 +222,8 @@ namespace Riftbourne.Combat
                 }
             }
 
-            // Record action and award XP
-            user.RecordAction();  // Award SP based on action count
-            int baseXP = GameConstants.Instance != null ? GameConstants.Instance.BaseActionXP : 5;
-            user.AwardXP(baseXP);  // Award XP for successful skill use
+            // Record action for SP system
+            user.RecordAction();
 
             // Mark that user has acted this turn
             user.MarkAsActed();
@@ -235,7 +262,7 @@ namespace Riftbourne.Combat
         /// <summary>
         /// Execute an AOE skill that affects multiple targets.
         /// </summary>
-        private void ExecuteAOESkill(Skill skill, Unit user, int targetX, int targetY, Unit primaryTarget)
+        private void ExecuteAOESkill(Skill skill, Unit user, int targetX, int targetY, Unit primaryTarget, WeaponProficiencyTier? proficiencyTier = null)
         {
             GridManager gridManager = ManagerRegistry.Get<GridManager>();
             if (gridManager == null)
@@ -300,19 +327,17 @@ namespace Riftbourne.Combat
             foreach (Unit affectedUnit in affectedUnits)
             {
                 bool wasAlive = affectedUnit.IsAlive;
-                ApplySkillEffectsToTarget(skill, user, affectedUnit);
+                ApplySkillEffectsToTarget(skill, user, affectedUnit, proficiencyTier);
                 if (wasAlive && !affectedUnit.IsAlive)
                 {
                     killCount++;
                 }
             }
 
-            // Award bonus XP for kills
+            // Track kills for proficiency (handled elsewhere)
             if (killCount > 0)
             {
-                int killBonus = GameConstants.Instance != null ? GameConstants.Instance.KillBonusXP : 25;
-                user.AwardXP(killBonus * killCount);
-                Debug.Log($"{user.UnitName} earned {killBonus * killCount} bonus XP for {killCount} kill(s)!");
+                Debug.Log($"{user.UnitName} eliminated {killCount} unit(s) with {skill.SkillName}!");
             }
 
             // Also create ground hazards if the skill creates them
@@ -340,10 +365,20 @@ namespace Riftbourne.Combat
         /// <summary>
         /// Apply skill effects (damage, status effects, stun) to a single target.
         /// </summary>
-        private void ApplySkillEffectsToTarget(Skill skill, Unit user, Unit target)
+        private void ApplySkillEffectsToTarget(Skill skill, Unit user, Unit target, WeaponProficiencyTier? proficiencyTier = null)
         {
             // Calculate and apply damage (includes stat scaling)
             int damage = skill.CalculateDamage(user);
+            
+            // Apply proficiency stat efficiency multiplier to damage if applicable
+            if (proficiencyTier.HasValue && damage > 0)
+            {
+                float statMultiplier = ProficiencyEffects.GetStatEfficiencyMultiplier(proficiencyTier.Value);
+                // Only apply multiplier if damage scales with stats (not pure base damage)
+                // For now, we'll apply it to all damage since skills use stat scaling
+                damage = Mathf.RoundToInt(damage * statMultiplier);
+            }
+            
             if (damage > 0)
             {
                 int actualDamage = target.TakeDamage(damage);

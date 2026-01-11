@@ -2,18 +2,25 @@ using UnityEngine;
 using Riftbourne.Characters;
 using Riftbourne.Combat;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Riftbourne.Core
 {
     /// <summary>
     /// Manages the player's party and which unit is currently selected for control.
     /// Singleton pattern for easy access from UI and input systems.
+    /// Tracks CharacterStates for party management and Units for battle selection.
     /// </summary>
     public class PartyManager : MonoBehaviour
     {
         public static PartyManager Instance { get; private set; }
 
-        [Header("Selected Unit")]
+        [Header("Party Management")]
+        [SerializeField] private int partySizeLimit = 6;
+        private List<CharacterState> partyMembers = new List<CharacterState>();
+        private CharacterState povCharacter;
+
+        [Header("Selected Unit (Battle Mode)")]
         private Unit selectedUnit;
 
         [Header("Selection Visuals")]
@@ -26,9 +33,11 @@ namespace Riftbourne.Core
         [SerializeField] private AudioClip unitSelectionSound;
 
         public Unit SelectedUnit => selectedUnit;
+        public CharacterState POVCharacter => povCharacter;
+        public int PartySizeLimit => partySizeLimit;
 
         private TurnManager turnManager;
-        private List<Unit> registeredPartyMembers = new List<Unit>();
+        private List<Unit> registeredPartyMembers = new List<Unit>(); // For backward compatibility during migration
 
         private void Awake()
         {
@@ -39,6 +48,7 @@ namespace Riftbourne.Core
             }
 
             Instance = this;
+            DontDestroyOnLoad(gameObject); // Persist across scenes
             turnManager = ManagerRegistry.Get<TurnManager>();
 
             // Initialize audio source if not assigned
@@ -141,19 +151,148 @@ namespace Riftbourne.Core
 
         /// <summary>
         /// Get all player-controlled units registered with the party manager.
+        /// Legacy method for backward compatibility (battle mode only).
         /// </summary>
-        public List<Unit> GetPartyMembers()
+        public List<Unit> GetPartyMembersAsUnits()
         {
             // Return a copy to prevent external modification
             return new List<Unit>(registeredPartyMembers);
         }
+
+        #region CharacterState Party Management
+
+        /// <summary>
+        /// Add a character to the party.
+        /// Validates party size limit.
+        /// </summary>
+        public bool AddPartyMember(CharacterState character)
+        {
+            if (character == null)
+            {
+                Debug.LogWarning("PartyManager: Cannot add null character to party!");
+                return false;
+            }
+
+            if (partyMembers.Contains(character))
+            {
+                Debug.LogWarning($"PartyManager: Character {character.CharacterID} is already in party!");
+                return false;
+            }
+
+            if (partyMembers.Count >= partySizeLimit)
+            {
+                Debug.LogWarning($"PartyManager: Party is full! Cannot add {character.CharacterID} (limit: {partySizeLimit})");
+                return false;
+            }
+
+            partyMembers.Add(character);
+            Debug.Log($"PartyManager: Added {character.CharacterID} to party ({partyMembers.Count}/{partySizeLimit})");
+
+            // If no POV character is set and this character can be POV, set it
+            if (povCharacter == null && character.Definition != null && character.Definition.IsPOVCharacter)
+            {
+                SetPOVCharacter(character);
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Remove a character from the party.
+        /// </summary>
+        public bool RemovePartyMember(CharacterState character)
+        {
+            if (character == null) return false;
+
+            if (partyMembers.Remove(character))
+            {
+                Debug.Log($"PartyManager: Removed {character.CharacterID} from party ({partyMembers.Count}/{partySizeLimit})");
+
+                // If removed character was POV, clear POV or set first available POV character
+                if (povCharacter == character)
+                {
+                    povCharacter = null;
+                    // Try to find another POV character
+                    foreach (var member in partyMembers)
+                    {
+                        if (member.Definition != null && member.Definition.IsPOVCharacter)
+                        {
+                            SetPOVCharacter(member);
+                            break;
+                        }
+                    }
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Set the POV (Point of View) character - the protagonist.
+        /// </summary>
+        public bool SetPOVCharacter(CharacterState character)
+        {
+            if (character == null)
+            {
+                Debug.LogWarning("PartyManager: Cannot set null character as POV!");
+                return false;
+            }
+
+            if (!partyMembers.Contains(character))
+            {
+                Debug.LogWarning($"PartyManager: Cannot set {character.CharacterID} as POV - not in party!");
+                return false;
+            }
+
+            if (character.Definition != null && !character.Definition.IsPOVCharacter)
+            {
+                Debug.LogWarning($"PartyManager: Character {character.CharacterID} is not marked as POV character!");
+                return false;
+            }
+
+            povCharacter = character;
+            Debug.Log($"PartyManager: Set {character.CharacterID} as POV character");
+            return true;
+        }
+
+        /// <summary>
+        /// Get all party members as CharacterStates.
+        /// </summary>
+        public List<CharacterState> GetPartyMembers()
+        {
+            // Return a copy to prevent external modification
+            return new List<CharacterState>(partyMembers);
+        }
+
+        /// <summary>
+        /// Check if a character is in the party.
+        /// </summary>
+        public bool IsInParty(CharacterState character)
+        {
+            return character != null && partyMembers.Contains(character);
+        }
+
+
+        /// <summary>
+        /// Clear the entire party.
+        /// </summary>
+        public void ClearParty()
+        {
+            partyMembers.Clear();
+            povCharacter = null;
+            Debug.Log("PartyManager: Cleared party");
+        }
+
+        #endregion
 
         /// <summary>
         /// Automatically select the first available party member at game start.
         /// </summary>
         public void SelectFirstPartyMember()
         {
-            List<Unit> party = GetPartyMembers();
+            List<Unit> party = GetPartyMembersAsUnits();
             if (party.Count > 0)
             {
                 SelectUnit(party[0]);

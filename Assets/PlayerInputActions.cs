@@ -136,6 +136,33 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""processors"": """",
                     ""interactions"": """",
                     ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Journal"",
+                    ""type"": ""Button"",
+                    ""id"": ""a1b2c3d4-e5f6-7890-abcd-ef1234567890"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""StatusMenu"",
+                    ""type"": ""Button"",
+                    ""id"": ""b2c3d4e5-f6a7-8901-bcde-f23456789012"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
+                },
+                {
+                    ""name"": ""Quicksave"",
+                    ""type"": ""Button"",
+                    ""id"": ""q1w2e3r4-t5y6-u7i8-o9p0-asdfghjklzxc"",
+                    ""expectedControlType"": ""Button"",
+                    ""processors"": """",
+                    ""interactions"": """",
+                    ""initialStateCheck"": false
                 }
             ],
             ""bindings"": [
@@ -248,6 +275,39 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
                     ""action"": ""Sprint"",
                     ""isComposite"": false,
                     ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""j1k2l3m4-n5o6-p7q8-rst9-uvwxyz012345"",
+                    ""path"": ""<Keyboard>/j"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""Journal"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""t1a2b3c4-d5e6-f7g8-hij9-klmnopqrst01"",
+                    ""path"": ""<Keyboard>/tab"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""StatusMenu"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
+                },
+                {
+                    ""name"": """",
+                    ""id"": ""f5q1w2e3-r4t5-y6u7-i8o9-p0asdfghjkl"",
+                    ""path"": ""<Keyboard>/f5"",
+                    ""interactions"": """",
+                    ""processors"": """",
+                    ""groups"": ""Keyboard&Mouse"",
+                    ""action"": ""Quicksave"",
+                    ""isComposite"": false,
+                    ""isPartOfComposite"": false
                 }
             ]
         }
@@ -261,6 +321,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         m_Gameplay_Move = m_Gameplay.FindAction("Move", throwIfNotFound: true);
         m_Gameplay_Look = m_Gameplay.FindAction("Look", throwIfNotFound: true);
         m_Gameplay_Sprint = m_Gameplay.FindAction("Sprint", throwIfNotFound: true);
+        m_Gameplay_Journal = m_Gameplay.FindAction("Journal", throwIfNotFound: true);
+        m_Gameplay_StatusMenu = m_Gameplay.FindAction("StatusMenu", throwIfNotFound: true);
+        m_Gameplay_Quicksave = m_Gameplay.FindAction("Quicksave", throwIfNotFound: true);
     }
 
     ~@PlayerInputActions()
@@ -346,6 +409,9 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
     private readonly InputAction m_Gameplay_Move;
     private readonly InputAction m_Gameplay_Look;
     private readonly InputAction m_Gameplay_Sprint;
+    private readonly InputAction m_Gameplay_Journal;
+    private readonly InputAction m_Gameplay_StatusMenu;
+    private readonly InputAction m_Gameplay_Quicksave;
     /// <summary>
     /// Provides access to input actions defined in input action map "Gameplay".
     /// </summary>
@@ -377,6 +443,18 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// Provides access to the underlying input action "Gameplay/Sprint".
         /// </summary>
         public InputAction @Sprint => m_Wrapper.m_Gameplay_Sprint;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/Journal".
+        /// </summary>
+        public InputAction @Journal => m_Wrapper.m_Gameplay_Journal;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/StatusMenu".
+        /// </summary>
+        public InputAction @StatusMenu => m_Wrapper.m_Gameplay_StatusMenu;
+        /// <summary>
+        /// Provides access to the underlying input action "Gameplay/Quicksave".
+        /// </summary>
+        public InputAction @Quicksave => m_Wrapper.m_Gameplay_Quicksave;
         /// <summary>
         /// Provides access to the underlying input action map instance.
         /// </summary>
@@ -418,6 +496,15 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Sprint.started += instance.OnSprint;
             @Sprint.performed += instance.OnSprint;
             @Sprint.canceled += instance.OnSprint;
+            @Journal.started += instance.OnJournal;
+            @Journal.performed += instance.OnJournal;
+            @Journal.canceled += instance.OnJournal;
+            @StatusMenu.started += instance.OnStatusMenu;
+            @StatusMenu.performed += instance.OnStatusMenu;
+            @StatusMenu.canceled += instance.OnStatusMenu;
+            @Quicksave.started += instance.OnQuicksave;
+            @Quicksave.performed += instance.OnQuicksave;
+            @Quicksave.canceled += instance.OnQuicksave;
         }
 
         /// <summary>
@@ -444,6 +531,15 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
             @Sprint.started -= instance.OnSprint;
             @Sprint.performed -= instance.OnSprint;
             @Sprint.canceled -= instance.OnSprint;
+            @Journal.started -= instance.OnJournal;
+            @Journal.performed -= instance.OnJournal;
+            @Journal.canceled -= instance.OnJournal;
+            @StatusMenu.started -= instance.OnStatusMenu;
+            @StatusMenu.performed -= instance.OnStatusMenu;
+            @StatusMenu.canceled -= instance.OnStatusMenu;
+            @Quicksave.started -= instance.OnQuicksave;
+            @Quicksave.performed -= instance.OnQuicksave;
+            @Quicksave.canceled -= instance.OnQuicksave;
         }
 
         /// <summary>
@@ -519,5 +615,26 @@ public partial class @PlayerInputActions: IInputActionCollection2, IDisposable
         /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
         /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
         void OnSprint(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Journal" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnJournal(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "StatusMenu" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnStatusMenu(InputAction.CallbackContext context);
+        /// <summary>
+        /// Method invoked when associated input action "Quicksave" is either <see cref="UnityEngine.InputSystem.InputAction.started" />, <see cref="UnityEngine.InputSystem.InputAction.performed" /> or <see cref="UnityEngine.InputSystem.InputAction.canceled" />.
+        /// </summary>
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.started" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.performed" />
+        /// <seealso cref="UnityEngine.InputSystem.InputAction.canceled" />
+        void OnQuicksave(InputAction.CallbackContext context);
     }
 }

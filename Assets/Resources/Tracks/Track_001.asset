@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a33dd45db305df64585b89e426dd7179, type: 3}
+  m_Name: Track_001
+  m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Story.NarrativeTrack
+  trackID: track_001
+  trackName: The Vectoran Occupation
+  trackDescription: Track description
+  chapters:
+  - {fileID: 11400000, guid: 9a01c7c08ee8412418fc52da11f4145a, type: 2}
+  trackSpecificCharacters:
+  - {fileID: 11400000, guid: bbc7d14640a829c47a8b67a52e266874, type: 2}
+  - {fileID: 11400000, guid: cd79b703698aeed46a561103b48cac4e, type: 2}
+  - {fileID: 11400000, guid: dfbbce13903c910429ba53ffe0b8c1c8, type: 2}

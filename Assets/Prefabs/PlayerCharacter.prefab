@@ -14,7 +14,6 @@ GameObject:
   - component: {fileID: 8652051379661686428}
   - component: {fileID: 6955456904013367620}
   - component: {fileID: 3795986060918009882}
-  - component: {fileID: 644141902914850966}
   - component: {fileID: 3485842601352279428}
   m_Layer: 0
   m_Name: PlayerCharacter
@@ -154,10 +153,38 @@ MonoBehaviour:
   codex: {fileID: 0}
   unitName: Player
   isPlayerControlled: 1
+  portrait: {fileID: 0}
+  factionData: {fileID: 0}
+  faction: 0
+  unitType: 1
   level: 1
   currentXP: 0
   skillPoints: 0
   totalActions: 0
+  characterState:
+    characterID: 
+    currentStrength: 0
+    currentFinesse: 0
+    currentFocus: 0
+    currentSpeed: 0
+    currentLuck: 0
+    currentPerception: 0
+    currentInterpretive: 0
+    currentEmpathic: 0
+    level: 0
+    currentXP: 0
+    skillPoints: 0
+    totalActions: 0
+    lastSPAwardedAtAction: 0
+    currentHP: 0
+    maxHP: 0
+    activeStatusEffectIDs: []
+    equippedItemIDs:
+      keys: 
+      values: []
+    knownSkillNames: []
+    masteredSkillNames: []
+    masteredPassiveSkillNames: []
 --- !u!114 &3795986060918009882
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -173,22 +200,6 @@ MonoBehaviour:
   gridManager: {fileID: 0}
   turnManager: {fileID: 0}
   unit: {fileID: 0}
---- !u!114 &644141902914850966
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1979788051672205453}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 68179dc41b0014d45b19a6e640cbb4bb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.UI.HPDisplay
-  unit: {fileID: 0}
-  canvas: {fileID: 0}
-  hpText: {fileID: 0}
-  offset: {x: 0, y: 2, z: 0}
 --- !u!114 &3485842601352279428
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -26,7 +26,7 @@ namespace Riftbourne.Combat
         /// Calculate the result of an attack from attacker to target.
         /// Handles hit/miss, parry, critical hits, and critical defense.
         /// </summary>
-        public static CombatResult CalculateAttack(Unit attacker, Unit target, int baseDamage)
+        public static CombatResult CalculateAttack(Unit attacker, Unit target, int baseDamage, WeaponProficiencyTier? proficiencyTier = null)
         {
             CombatResult result = new CombatResult
             {
@@ -37,9 +37,9 @@ namespace Riftbourne.Combat
                 FinalDamage = 0
             };
 
-            // Get combat stats for attacker and target
-            float attackerHitChance = GetHitChance(attacker);
-            float attackerCritChance = GetCritChance(attacker);
+            // Get combat stats for attacker and target (with proficiency effects)
+            float attackerHitChance = GetHitChance(attacker, proficiencyTier);
+            float attackerCritChance = GetCritChance(attacker, proficiencyTier);
             float targetParryChance = GetParryChance(target);
             float targetCritDefense = GetCritDefense(target);
 
@@ -100,33 +100,48 @@ namespace Riftbourne.Combat
         }
 
         /// <summary>
-        /// Get the hit chance for a unit (base + status effect modifiers).
+        /// Get the hit chance for a unit (base + status effect modifiers + proficiency effects).
         /// </summary>
-        private static float GetHitChance(Unit unit)
+        private static float GetHitChance(Unit unit, WeaponProficiencyTier? proficiencyTier = null)
         {
             float baseHitChance = GameConstants.Instance != null ? GameConstants.Instance.BaseHitChance : 90f;
             
             // Finesse affects hit chance (higher finesse = better accuracy)
-            float finesseBonus = unit.Finesse * (GameConstants.Instance != null ? GameConstants.Instance.FinesseHitChancePerPoint : 1f);
+            // Apply proficiency stat efficiency multiplier
+            float statMultiplier = proficiencyTier.HasValue 
+                ? ProficiencyEffects.GetStatEfficiencyMultiplier(proficiencyTier.Value) 
+                : 1.0f;
+            
+            float finesseBonus = (unit.Finesse * statMultiplier) * (GameConstants.Instance != null ? GameConstants.Instance.FinesseHitChancePerPoint : 1f);
             
             // Get status effect modifiers
             float statusModifier = unit.GetTotalHitChanceModifier();
             
-            float totalHitChance = baseHitChance + finesseBonus + statusModifier;
+            // Apply proficiency variance reduction
+            float varianceReduction = proficiencyTier.HasValue 
+                ? ProficiencyEffects.GetVarianceReduction(proficiencyTier.Value) 
+                : 0f;
+            
+            float totalHitChance = baseHitChance + finesseBonus + statusModifier + varianceReduction;
             
             // Clamp between 5% and 95% (always a chance to miss/hit)
             return Mathf.Clamp(totalHitChance, 5f, 95f);
         }
 
         /// <summary>
-        /// Get the critical hit chance for a unit (base + status effect modifiers).
+        /// Get the critical hit chance for a unit (base + status effect modifiers + proficiency effects).
         /// </summary>
-        private static float GetCritChance(Unit unit)
+        private static float GetCritChance(Unit unit, WeaponProficiencyTier? proficiencyTier = null)
         {
             float baseCritChance = GameConstants.Instance != null ? GameConstants.Instance.BaseCritChance : 5f;
             
             // Luck affects crit chance
-            float luckBonus = unit.Luck * (GameConstants.Instance != null ? GameConstants.Instance.LuckCritChancePerPoint : 0.5f);
+            // Apply proficiency stat efficiency multiplier
+            float statMultiplier = proficiencyTier.HasValue 
+                ? ProficiencyEffects.GetStatEfficiencyMultiplier(proficiencyTier.Value) 
+                : 1.0f;
+            
+            float luckBonus = (unit.Luck * statMultiplier) * (GameConstants.Instance != null ? GameConstants.Instance.LuckCritChancePerPoint : 0.5f);
             
             // Get status effect modifiers
             float statusModifier = unit.GetTotalCritChanceModifier();
@@ -157,14 +172,19 @@ namespace Riftbourne.Combat
         }
 
         /// <summary>
-        /// Get the critical defense chance for a unit (base + status effect modifiers).
+        /// Get the critical defense chance for a unit (base + status effect modifiers + proficiency effects).
         /// </summary>
-        private static float GetCritDefense(Unit unit)
+        private static float GetCritDefense(Unit unit, WeaponProficiencyTier? proficiencyTier = null)
         {
             float baseCritDefense = GameConstants.Instance != null ? GameConstants.Instance.BaseCritDefense : 10f;
             
             // Focus affects crit defense (mental awareness helps avoid critical hits)
-            float focusBonus = unit.Focus * (GameConstants.Instance != null ? GameConstants.Instance.FocusCritDefensePerPoint : 0.5f);
+            // Apply proficiency stat efficiency multiplier
+            float statMultiplier = proficiencyTier.HasValue 
+                ? ProficiencyEffects.GetStatEfficiencyMultiplier(proficiencyTier.Value) 
+                : 1.0f;
+            
+            float focusBonus = (unit.Focus * statMultiplier) * (GameConstants.Instance != null ? GameConstants.Instance.FocusCritDefensePerPoint : 0.5f);
             
             // Get status effect modifiers
             float statusModifier = unit.GetTotalCritDefenseModifier();
