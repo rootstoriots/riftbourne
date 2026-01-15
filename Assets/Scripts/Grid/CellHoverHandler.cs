@@ -18,6 +18,7 @@ namespace Riftbourne.Grid
         private GridManager gridManager;
         private GridCell currentHoverCell;
         private CameraService cameraService;
+        private bool enabled = true; // Flag to enable/disable hover handler
 
         private void Awake()
         {
@@ -96,6 +97,17 @@ namespace Riftbourne.Grid
 
         private void UpdateHoverHighlight()
         {
+            // If disabled, hide highlight and return early
+            if (!enabled)
+            {
+                if (hoverHighlight != null)
+                {
+                    hoverHighlight.SetActive(false);
+                }
+                currentHoverCell = null;
+                return;
+            }
+            
             // Ensure hover highlight exists
             if (hoverHighlight == null)
             {
@@ -109,6 +121,15 @@ namespace Riftbourne.Grid
             if (gridManager == null || Mouse.current == null)
             {
                 hoverHighlight.SetActive(false);
+                return;
+            }
+
+            // Check if grid has been generated
+            if (!gridManager.IsGridInitialized)
+            {
+                // Grid not generated yet, hide highlight
+                hoverHighlight.SetActive(false);
+                currentHoverCell = null;
                 return;
             }
 
@@ -203,6 +224,25 @@ namespace Riftbourne.Grid
         public GridCell GetHoveredCell()
         {
             return currentHoverCell;
+        }
+        
+        /// <summary>
+        /// Enable or disable the hover handler.
+        /// When disabled, hover highlights will not be shown.
+        /// </summary>
+        public void SetEnabled(bool enabled)
+        {
+            this.enabled = enabled;
+            if (!enabled)
+            {
+                // Hide highlight when disabling
+                if (hoverHighlight != null)
+                {
+                    hoverHighlight.SetActive(false);
+                }
+                currentHoverCell = null;
+            }
+            Debug.Log($"CellHoverHandler: Enabled = {enabled}");
         }
     }
 }

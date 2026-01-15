@@ -79,6 +79,18 @@ namespace Riftbourne.Core
         /// </summary>
         public static event Action<bool> OnCombatEnded;
 
+        /// <summary>
+        /// Event raised when a critical hit occurs.
+        /// Parameters: (attacker, target, damageAmount)
+        /// </summary>
+        public static event Action<Unit, Unit, int> OnCriticalHit;
+
+        /// <summary>
+        /// Event raised when a skill is used.
+        /// Parameters: (user, skill, target)
+        /// </summary>
+        public static event Action<Unit, Skill, Unit> OnSkillUsed;
+
         // Event Invocation Methods (for raising events)
         public static void RaiseUnitHPChanged(Unit unit, int currentHP, int maxHP)
         {
@@ -138,6 +150,16 @@ namespace Riftbourne.Core
         public static void RaiseAttackMissed(Unit targetUnit)
         {
             OnAttackMissed?.Invoke(targetUnit);
+        }
+
+        public static void RaiseCriticalHit(Unit attacker, Unit target, int damageAmount)
+        {
+            OnCriticalHit?.Invoke(attacker, target, damageAmount);
+        }
+
+        public static void RaiseSkillUsed(Unit user, Skill skill, Unit target)
+        {
+            OnSkillUsed?.Invoke(user, skill, target);
         }
     }
 }

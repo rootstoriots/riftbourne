@@ -8,6 +8,7 @@ using Riftbourne.Combat;
 using Riftbourne.Skills;
 using Riftbourne.Grid;
 using Riftbourne.Core;
+using Riftbourne.Items;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;

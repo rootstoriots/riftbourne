@@ -30,6 +30,12 @@ MonoBehaviour:
   availableSkills: []
   startingEquipment:
   - {fileID: 11400000, guid: 48cdfc6920a2ce649b309ba8a42cb259, type: 2}
+  startingInventory:
+  - item: {fileID: 11400000, guid: dfc080644dc8de24198ed539911b40a0, type: 2}
+    quantity: 1
+  - item: {fileID: 11400000, guid: d0c020c7af4e6fc48a389e192aa174e1, type: 2}
+    quantity: 2
+  startingAurumShards: 100
   isPOVCharacter: 1
   availableChapters:
   - Chapter001

@@ -14,12 +14,15 @@ namespace Riftbourne.Grid
         [SerializeField] private Material invalidRangeMaterial;
 
         private List<GameObject> activeHighlights = new List<GameObject>();
+        private bool enabled = true; // Flag to enable/disable visualizer
 
         /// <summary>
         /// Show green highlights for valid movement cells.
         /// </summary>
         public void ShowMovementRange(List<GridCell> cells)
         {
+            if (!enabled) return; // Don't show if visualizer is disabled
+            
             ClearHighlights();
 
             foreach (GridCell cell in cells)
@@ -35,6 +38,7 @@ namespace Riftbourne.Grid
         /// </summary>
         public void ShowAttackRange(List<GridCell> cells)
         {
+            if (!enabled) return; // Don't show if visualizer is disabled
             if (cells == null) return;
 
             ClearHighlights();
@@ -47,6 +51,20 @@ namespace Riftbourne.Grid
                     CreateHighlight(cell, attackRangeMaterial, 0.02f); // Lowered so hover can appear above
                 }
             }
+        }
+        
+        /// <summary>
+        /// Enable or disable the range visualizer.
+        /// When disabled, ShowMovementRange and ShowAttackRange will not display highlights.
+        /// </summary>
+        public void SetEnabled(bool enabled)
+        {
+            this.enabled = enabled;
+            if (!enabled)
+            {
+                ClearHighlights(); // Clear any existing highlights when disabling
+            }
+            Debug.Log($"RangeVisualizer: Enabled = {enabled}");
         }
 
         /// <summary>

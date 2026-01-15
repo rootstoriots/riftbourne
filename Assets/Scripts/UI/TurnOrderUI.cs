@@ -82,7 +82,11 @@ namespace Riftbourne.UI
 
         private IEnumerator InitializeDelayed()
         {
+            // Wait a bit longer to ensure all units (including enemies) are spawned
             yield return null;
+            yield return null;
+            yield return new WaitForSeconds(0.3f);
+            
             CreateAllPortraits();
             UpdateTurnOrderLayout(immediate: true);
         }
@@ -131,6 +135,9 @@ namespace Riftbourne.UI
         /// </summary>
         private void OnTurnWindowChanged(List<Unit> currentWindow)
         {
+            // Check for new units and create portraits for them
+            RefreshPortraits();
+            
             if (isAnimating)
             {
                 // If animating, queue the update for after animation completes
@@ -154,6 +161,37 @@ namespace Riftbourne.UI
                 UpdateTurnOrderLayout(immediate: false);
             }
         }
+        
+        /// <summary>
+        /// Refresh portraits - create any missing ones for units that don't have portraits yet.
+        /// </summary>
+        private void RefreshPortraits()
+        {
+            if (turnManager == null) return;
+            
+            List<Unit> units = turnManager.GetAllUnits();
+            int createdCount = 0;
+            
+            foreach (Unit unit in units)
+            {
+                if (unit == null) continue;
+                
+                // Check if portrait already exists for this unit
+                TurnOrderPortrait existingPortrait = portraits.Find(p => p.unit == unit);
+                if (existingPortrait == null)
+                {
+                    CreatePortrait(unit);
+                    createdCount++;
+                }
+            }
+            
+            if (createdCount > 0)
+            {
+                Debug.Log($"TurnOrderUI: Created {createdCount} new portraits (total: {portraits.Count})");
+                // Update layout to show new portraits
+                UpdateTurnOrderLayout(immediate: false);
+            }
+        }
 
         /// <summary>
         /// Event handler for when a unit ends their turn.
@@ -169,12 +207,22 @@ namespace Riftbourne.UI
             if (turnManager == null) return;
 
             List<Unit> units = turnManager.GetAllUnits();
-            Debug.Log($"TurnOrderUI: Creating {units.Count} portraits");
+            Debug.Log($"TurnOrderUI: Creating portraits for {units.Count} units");
 
+            // Create portraits for any units that don't have one yet
             foreach (Unit unit in units)
             {
-                CreatePortrait(unit);
+                if (unit == null) continue;
+                
+                // Check if portrait already exists for this unit
+                TurnOrderPortrait existingPortrait = portraits.Find(p => p.unit == unit);
+                if (existingPortrait == null)
+                {
+                    CreatePortrait(unit);
+                }
             }
+            
+            Debug.Log($"TurnOrderUI: Total portraits: {portraits.Count}");
         }
 
         private int CalculateMaxVisiblePortraits()

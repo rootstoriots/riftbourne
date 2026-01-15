@@ -41,6 +41,9 @@ namespace Riftbourne.UI
         [Header("Journal Tab")]
         [SerializeField] private JournalUI journalUI;
         
+        [Header("Inventory Tab")]
+        [SerializeField] private InventoryUI inventoryUI;
+        
         [Header("Map Tab")]
         [SerializeField] private TMP_Text mapPlaceholderText;
         
@@ -566,7 +569,7 @@ namespace Riftbourne.UI
                     break;
                 case TabType.Inventory:
                     if (inventoryTabPanel != null) inventoryTabPanel.SetActive(true);
-                    // TODO: Implement inventory tab
+                    RefreshInventoryTab();
                     break;
                 case TabType.Journal:
                     if (journalTabPanel != null) journalTabPanel.SetActive(true);
@@ -591,6 +594,41 @@ namespace Riftbourne.UI
             if (journalUI != null)
             {
                 journalUI.RefreshEntries();
+            }
+        }
+        
+        /// <summary>
+        /// Refresh the Inventory tab display.
+        /// Uses the same character selection logic as other tabs (GetCurrentUnit).
+        /// </summary>
+        private void RefreshInventoryTab()
+        {
+            // Always ensure we have the current character (same as StatusTab does)
+            // GetCurrentUnit() is called when menu opens, but ensure it's set here too
+            if (currentCharacterState == null && currentUnit == null)
+            {
+                GetCurrentUnit();
+            }
+            
+            // Debug log to verify character is set
+            if (currentCharacterState == null && currentUnit == null)
+            {
+                Debug.LogWarning("[StatusMenuUI] RefreshInventoryTab: No character found after GetCurrentUnit()!");
+            }
+            else
+            {
+                Debug.Log($"[StatusMenuUI] RefreshInventoryTab: Using character - Unit: {currentUnit?.UnitName ?? "null"}, CharacterState: {currentCharacterState?.Definition?.CharacterName ?? "null"}");
+            }
+            
+            if (inventoryUI != null)
+            {
+                // Pass current character to inventory UI (same as StatusTab uses)
+                // These are the exact same variables that RefreshStatusTab() uses
+                inventoryUI.RefreshDisplay(currentUnit, currentCharacterState);
+            }
+            else
+            {
+                Debug.LogWarning("[StatusMenuUI] InventoryUI reference is null! Assign it in Inspector.");
             }
         }
         
@@ -1133,11 +1171,8 @@ namespace Riftbourne.UI
                 }
             }
             
-            // Refresh status tab to show new character
-            if (currentTab == TabType.Status)
-            {
-                RefreshStatusTab();
-            }
+            // Refresh current tab to show new character
+            RefreshCurrentTab();
         }
         
         /// <summary>

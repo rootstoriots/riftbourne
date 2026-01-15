@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Riftbourne.Combat;
+using Riftbourne.Items;
 
 namespace Riftbourne.Characters
 {

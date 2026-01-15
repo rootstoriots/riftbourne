@@ -1,4 +1,5 @@
 using Riftbourne.Skills;
+using Riftbourne.Items;
 using System;
 using System.Collections.Generic;
 

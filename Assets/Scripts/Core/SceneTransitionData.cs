@@ -1,5 +1,6 @@
 using UnityEngine;
 using Riftbourne.Characters;
+using Riftbourne.Combat;
 using System.Collections.Generic;
 
 namespace Riftbourne.Core
@@ -21,6 +22,8 @@ namespace Riftbourne.Core
 
         [Header("Battle Information")]
         [SerializeField] private Vector3 battleStartPosition = Vector3.zero;
+        [Tooltip("Encounter data for the battle (optional - if null, CombatInitiator will use Inspector-assigned encounter)")]
+        [SerializeField] private EncounterData encounterData;
         
         [Header("Exploration Position")]
         [Tooltip("Player position in exploration scene before battle")]
@@ -57,6 +60,12 @@ namespace Riftbourne.Core
             set => explorationPosition = value;
         }
 
+        public EncounterData EncounterData
+        {
+            get => encounterData;
+            set => encounterData = value;
+        }
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -78,6 +87,7 @@ namespace Riftbourne.Core
             returnSceneName = "";
             battleStartPosition = Vector3.zero;
             explorationPosition = Vector3.zero;
+            encounterData = null;
         }
     }
 }

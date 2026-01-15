@@ -87,6 +87,10 @@ namespace Riftbourne.Core
                 {
                     // Update CharacterState from Unit
                     matchingState.UpdateFromUnit(unit);
+                    
+                    // Sync inventory from Unit to CharacterState
+                    unit.SyncInventoryToCharacterState();
+                    
                     Debug.Log($"ExplorationSceneLoader: Updated {matchingState.CharacterID} from battle Unit {unit.UnitName}");
                 }
                 else

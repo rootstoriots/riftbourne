@@ -1,3 +1,5 @@
+using Riftbourne.Items;
+
 namespace Riftbourne.Characters
 {
     /// <summary>

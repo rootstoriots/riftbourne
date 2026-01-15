@@ -9,11 +9,16 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 46eab276b8fd0af459aef26b314ec6d0, type: 3}
+  m_Script: {fileID: 11500000, guid: fbae774c4da655c4088d3bc228fcbe56, type: 3}
   m_Name: Dagger_ScoutsDirk
   m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Characters.EquipmentItem
   itemName: Scout's Dirk
   description: 
+  icon: {fileID: 0}
+  rarity: 0
+  weight: 0.3
+  baseValue: 100
+  maxStackSize: 1
   compatibleSlots: 00000000
   meleeWeaponType: 1
   rangedWeaponType: 0
@@ -21,12 +26,13 @@ MonoBehaviour:
   rangeBonus: 0
   grantedSkills: []
   grantedPassiveSkills: []
-  attackBonus: 5
+  attackBonus: 2
   defenseBonus: 0
-  strengthBonus: -1
+  strengthBonus: 0
   finesseBonus: 1
-  focusBonus: 1
-  speedBonus: 2
-  luckBonus: 1
+  focusBonus: 0
+  speedBonus: 1
+  luckBonus: 0
   maxHPBonusPercent: 0
-  icon: {fileID: 21300000, guid: ebcfbee20cfa2a74089978e6b0f11b82, type: 3}
+  currentDurability: 100
+  maxDurability: 100

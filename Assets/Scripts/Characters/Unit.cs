@@ -4,9 +4,12 @@ using Riftbourne.Skills;
 using Riftbourne.Combat;
 using Riftbourne.UI;
 using Riftbourne.Core;
+using Riftbourne.Items;
+using Riftbourne.Inventory;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace Riftbourne.Characters
 {
@@ -45,6 +48,13 @@ namespace Riftbourne.Characters
         [SerializeField] private EquipmentItem accessory1;
         [SerializeField] private EquipmentItem accessory2;
         [SerializeField] private EquipmentItem codex;
+
+        [Header("Inventory System")]
+        [SerializeField] private List<InventorySlot> inventory = new List<InventorySlot>();
+        [SerializeField] private List<InventorySlot> containerInventory = new List<InventorySlot>();
+        [SerializeField] private ContainerItem[] containerSlots = new ContainerItem[2];
+        [SerializeField] private int maxContainerSlots = 2;
+        [SerializeField] private int aurumShards = 0;
 
         [Header("Unit Identity")]
         [SerializeField] private string unitName = "Unit";
@@ -104,6 +114,9 @@ namespace Riftbourne.Characters
         public List<Skill> KnownSkills => knownSkills;
         public bool IsBurning => unitStatusEffects != null && unitStatusEffects.IsBurning;
         public StatusEffect BurnEffect => unitStatusEffects?.BurnEffect;
+        public List<InventorySlot> Inventory => inventory;
+        public List<InventorySlot> ContainerInventory => containerInventory;
+        public ContainerItem[] ContainerSlots => containerSlots;
         public int MaxHP => CalculateMaxHP();
         public int CurrentHP => unitCombat != null ? unitCombat.CurrentHP : currentHP;
         public int AttackPower => unitCombat != null ? unitCombat.GetAttackPower(unitEquipment.GetTotalEquipmentBonus(StatType.Attack) + unitEquipment.GetTotalPassiveSkillBonus(StatType.Attack)) : (attackPower + unitEquipment.GetTotalEquipmentBonus(StatType.Attack) + unitEquipment.GetTotalPassiveSkillBonus(StatType.Attack));
@@ -142,6 +155,168 @@ namespace Riftbourne.Characters
         public string UnitName => unitName;
         public bool IsPlayerControlled => isPlayerControlled;
         public Sprite Portrait => portrait;
+        
+        // Encumbrance-Affected Stats (Effective Stats)
+        public int EffectiveMovementRange
+        {
+            get
+            {
+                int baseRange = MovementRange;
+                
+                // Apply encumbrance penalties
+                float encumbrance = EncumbrancePercent;
+                
+                if (encumbrance > 2.0f)
+                    baseRange -= 4;
+                else if (encumbrance > 1.5f)
+                    baseRange -= 3;
+                else if (encumbrance > 1.25f)
+                    baseRange -= 2;
+                else if (encumbrance > 1.0f)
+                    baseRange -= 1;
+                
+                return Mathf.Max(1, baseRange);
+            }
+        }
+
+        public int EffectiveSpeed
+        {
+            get
+            {
+                int baseSpeed = Speed;
+                
+                float encumbrance = EncumbrancePercent;
+                
+                if (encumbrance > 2.0f)
+                    baseSpeed -= 5;
+                else if (encumbrance > 1.5f)
+                    baseSpeed -= 3;
+                else if (encumbrance > 1.25f)
+                    baseSpeed -= 2;
+                else if (encumbrance > 1.0f)
+                    baseSpeed -= 1;
+                
+                return Mathf.Max(1, baseSpeed);
+            }
+        }
+
+        public int EffectiveAttackPower
+        {
+            get
+            {
+                float baseAttack = AttackPower;
+                float multiplier = 1.0f;
+                
+                float encumbrance = EncumbrancePercent;
+                
+                if (encumbrance > 2.0f)
+                    multiplier = 0.7f;
+                else if (encumbrance > 1.5f)
+                    multiplier = 0.8f;
+                else if (encumbrance > 1.25f)
+                    multiplier = 0.9f;
+                
+                return Mathf.RoundToInt(baseAttack * multiplier);
+            }
+        }
+
+        public int EffectiveDefensePower
+        {
+            get
+            {
+                float baseDefense = DefensePower;
+                float multiplier = 1.0f;
+                
+                float encumbrance = EncumbrancePercent;
+                
+                if (encumbrance > 2.0f)
+                    multiplier = 0.7f;
+                else if (encumbrance > 1.5f)
+                    multiplier = 0.8f;
+                else if (encumbrance > 1.25f)
+                    multiplier = 0.9f;
+                
+                return Mathf.RoundToInt(baseDefense * multiplier);
+            }
+        }
+
+        public int EffectiveFinesse
+        {
+            get
+            {
+                int baseFinesse = Finesse;
+                
+                float encumbrance = EncumbrancePercent;
+                
+                if (encumbrance > 2.0f)
+                    baseFinesse -= 5;
+                else if (encumbrance > 1.5f)
+                    baseFinesse -= 2;
+                
+                return Mathf.Max(0, baseFinesse);
+            }
+        }
+
+        // Inventory Weight Properties
+        public float BaseCarryCapacity => Strength * 5.0f;
+        
+        public float CurrentWeight
+        {
+            get
+            {
+                float total = 0f;
+                
+                // Main inventory weight
+                foreach (var slot in inventory)
+                {
+                    if (slot != null && slot.Item != null)
+                        total += slot.GetTotalWeight();
+                }
+                
+                // Container inventory (with reduction applied)
+                foreach (var slot in containerInventory)
+                {
+                    if (slot != null && slot.Item != null)
+                    {
+                        float reduction = GetContainerReduction();
+                        total += slot.GetTotalWeight() * (1f - reduction);
+                    }
+                }
+                
+                // Equipped battle items (50% weight)
+                if (unitEquipment != null)
+                {
+                    foreach (var kvp in unitEquipment.EquippedItems)
+                    {
+                        if (kvp.Value != null && kvp.Value is EquipmentItem equipItem)
+                        {
+                            total += equipItem.Weight * 0.5f;
+                        }
+                    }
+                }
+                
+                return total;
+            }
+        }
+        
+        public float EffectiveCarryCapacity
+        {
+            get
+            {
+                float capacity = BaseCarryCapacity;
+                
+                // Containers don't add capacity, they reduce weight of contents
+                // Capacity is purely strength-based
+                
+                return capacity;
+            }
+        }
+        
+        public float EncumbrancePercent => EffectiveCarryCapacity > 0 ? CurrentWeight / EffectiveCarryCapacity : 0f;
+        
+        public bool IsOverencumbered => EncumbrancePercent > 1.0f;
+        
+        public int AurumShards => aurumShards;
         
         /// <summary>
         /// Get the faction enum. If using ScriptableObject faction, returns the mapped enum.
@@ -455,23 +630,40 @@ namespace Riftbourne.Characters
             }
         }
 
+        private bool isUnregistering = false; // Guard to prevent infinite loops
+
         private void UnregisterFromManagers()
         {
-            // Unregister from TurnManager
-            TurnManager turnManager = ManagerRegistry.Get<TurnManager>();
-            if (turnManager != null)
+            // Guard against infinite loops
+            if (isUnregistering)
             {
-                turnManager.UnregisterUnit(this);
+                return;
             }
 
-            // Unregister from PartyManager if player-controlled
-            if (isPlayerControlled)
+            isUnregistering = true;
+
+            try
             {
-                PartyManager partyManager = PartyManager.Instance;
-                if (partyManager != null)
+                // Unregister from TurnManager
+                TurnManager turnManager = ManagerRegistry.Get<TurnManager>();
+                if (turnManager != null)
                 {
-                    partyManager.UnregisterUnit(this);
+                    turnManager.UnregisterUnit(this);
                 }
+
+                // Unregister from PartyManager if player-controlled
+                if (isPlayerControlled)
+                {
+                    PartyManager partyManager = PartyManager.Instance;
+                    if (partyManager != null)
+                    {
+                        partyManager.UnregisterUnit(this);
+                    }
+                }
+            }
+            finally
+            {
+                isUnregistering = false;
             }
         }
 
@@ -555,6 +747,21 @@ namespace Riftbourne.Characters
                 Debug.Log($"{unitName} took {damage} damage! HP: {currentHP}/{MaxHP}");
             }
 
+            // Apply durability loss to armor
+            if (unitEquipment != null && unitEquipment.EquippedItems.TryGetValue(EquipmentSlot.Armor, out var armor))
+            {
+                if (armor is EquipmentItem equipItem)
+                {
+                    equipItem.LoseDurability(damage * 0.1f);
+                    
+                    if (equipItem.IsBroken)
+                    {
+                        Debug.LogWarning($"{unitName}'s {equipItem.ItemName} is broken!");
+                        // Recalculate stats since armor bonuses are now 0
+                    }
+                }
+            }
+
             // Raise HP changed events (both local and global)
             OnHPChanged?.Invoke(currentHP, MaxHP);
             GameEvents.RaiseUnitHPChanged(this, currentHP, MaxHP);
@@ -583,6 +790,21 @@ namespace Riftbourne.Characters
             currentHP = unitCombat.CurrentHP;
 
             Debug.Log($"{unitName} took {damage} damage! HP: {currentHP}/{MaxHP}");
+
+            // Apply durability loss to armor
+            if (unitEquipment != null && unitEquipment.EquippedItems.TryGetValue(EquipmentSlot.Armor, out var armor))
+            {
+                if (armor is EquipmentItem equipItem)
+                {
+                    equipItem.LoseDurability(damage * 0.1f);
+                    
+                    if (equipItem.IsBroken)
+                    {
+                        Debug.LogWarning($"{unitName}'s {equipItem.ItemName} is broken!");
+                        // Recalculate stats since armor bonuses are now 0
+                    }
+                }
+            }
 
             // Raise HP changed events (both local and global)
             OnHPChanged?.Invoke(currentHP, MaxHP);
@@ -956,6 +1178,334 @@ namespace Riftbourne.Characters
 
         #endregion
 
+        #region Inventory System
+
+        /// <summary>
+        /// Helper method to get the maximum container reduction from all equipped containers.
+        /// </summary>
+        private float GetContainerReduction()
+        {
+            float maxReduction = 0f;
+            
+            foreach (var container in containerSlots)
+            {
+                if (container != null)
+                {
+                    maxReduction = Mathf.Max(maxReduction, container.EncumbranceReduction);
+                }
+            }
+            
+            return maxReduction;
+        }
+
+        /// <summary>
+        /// Helper method to get total container capacity from all equipped containers.
+        /// </summary>
+        private int GetTotalContainerCapacity()
+        {
+            int total = 0;
+            
+            foreach (var container in containerSlots)
+            {
+                if (container != null)
+                {
+                    total += container.SlotCapacity;
+                }
+            }
+            
+            return total;
+        }
+
+        /// <summary>
+        /// Add an item to the inventory.
+        /// Returns true if item was added successfully.
+        /// </summary>
+        public bool AddItem(Item item, int quantity = 1)
+        {
+            if (item == null || quantity <= 0)
+                return false;
+            
+            // Validate no container nesting
+            if (item is ContainerItem containerToAdd)
+            {
+                foreach (var slot in containerInventory)
+                {
+                    if (slot != null && slot.Item is ContainerItem)
+                    {
+                        Debug.LogWarning("Cannot nest containers inside containers!");
+                        return false;
+                    }
+                }
+            }
+            
+            int remaining = quantity;
+            
+            // Try to stack with existing slots first
+            foreach (var slot in inventory)
+            {
+                if (slot != null && slot.CanStack(item))
+                {
+                    remaining = slot.AddToStack(remaining);
+                    if (remaining <= 0)
+                        return true;
+                }
+            }
+            
+            // Create new slots for remaining quantity
+            while (remaining > 0)
+            {
+                int stackSize = Mathf.Min(remaining, item.MaxStackSize);
+                inventory.Add(new InventorySlot(item, stackSize));
+                remaining -= stackSize;
+            }
+            
+            return true;
+        }
+
+        /// <summary>
+        /// Remove an item from the inventory.
+        /// Returns true if at least some quantity was removed.
+        /// </summary>
+        public bool RemoveItem(Item item, int quantity = 1)
+        {
+            if (item == null || quantity <= 0)
+                return false;
+            
+            int remaining = quantity;
+            
+            // Remove from slots
+            for (int i = inventory.Count - 1; i >= 0; i--)
+            {
+                var slot = inventory[i];
+                if (slot != null && slot.Item == item)
+                {
+                    int removed = slot.RemoveFromStack(remaining);
+                    remaining -= removed;
+                    
+                    if (slot.IsEmpty())
+                        inventory.RemoveAt(i);
+                    
+                    if (remaining <= 0)
+                        return true;
+                }
+            }
+            
+            return remaining < quantity; // Returns true if at least some was removed
+        }
+
+        /// <summary>
+        /// Get the total count of a specific item in inventory.
+        /// </summary>
+        public int GetItemCount(Item item)
+        {
+            int count = 0;
+            
+            foreach (var slot in inventory)
+            {
+                if (slot != null && slot.Item == item)
+                    count += slot.Quantity;
+            }
+            
+            return count;
+        }
+
+        /// <summary>
+        /// Check if unit has a specific item in the required quantity.
+        /// </summary>
+        public bool HasItem(Item item, int quantity = 1)
+        {
+            return GetItemCount(item) >= quantity;
+        }
+
+        /// <summary>
+        /// Equip a container to a container slot.
+        /// Returns true if successful.
+        /// </summary>
+        public bool EquipContainer(ContainerItem container, int slotIndex)
+        {
+            if (container == null)
+                return false;
+            
+            if (slotIndex < 0 || slotIndex >= maxContainerSlots)
+            {
+                Debug.LogWarning($"Invalid container slot index: {slotIndex}");
+                return false;
+            }
+            
+            // Check if item is in inventory
+            if (!HasItem(container, 1))
+            {
+                Debug.LogWarning("Container not in inventory!");
+                return false;
+            }
+            
+            // Unequip existing container in this slot
+            if (containerSlots[slotIndex] != null)
+            {
+                UnequipContainer(slotIndex);
+            }
+            
+            // Equip new container
+            containerSlots[slotIndex] = container;
+            RemoveItem(container, 1);
+            
+            Debug.Log($"Equipped {container.ItemName} to container slot {slotIndex}");
+            return true;
+        }
+
+        /// <summary>
+        /// Unequip a container from a container slot.
+        /// Items in the container are moved to main inventory.
+        /// </summary>
+        public void UnequipContainer(int slotIndex)
+        {
+            if (slotIndex < 0 || slotIndex >= maxContainerSlots)
+                return;
+            
+            var container = containerSlots[slotIndex];
+            if (container == null)
+                return;
+            
+            // Move all items from container inventory to main inventory
+            foreach (var slot in containerInventory)
+            {
+                if (slot != null && slot.Item != null)
+                {
+                    AddItem(slot.Item, slot.Quantity);
+                }
+            }
+            
+            containerInventory.Clear();
+            
+            // Return container to inventory
+            AddItem(container, 1);
+            containerSlots[slotIndex] = null;
+            
+            Debug.Log($"Unequipped {container.ItemName} from slot {slotIndex}");
+        }
+
+        /// <summary>
+        /// Move an item from main inventory to container inventory.
+        /// Returns true if successful.
+        /// </summary>
+        public bool MoveToContainer(Item item, int quantity = 1)
+        {
+            if (GetTotalContainerCapacity() <= 0)
+            {
+                Debug.LogWarning("No containers equipped!");
+                return false;
+            }
+            
+            if (containerInventory.Count >= GetTotalContainerCapacity())
+            {
+                Debug.LogWarning("Container is full!");
+                return false;
+            }
+            
+            if (!HasItem(item, quantity))
+                return false;
+            
+            // Prevent container nesting
+            if (item is ContainerItem)
+            {
+                Debug.LogWarning("Cannot put containers inside containers!");
+                return false;
+            }
+            
+            RemoveItem(item, quantity);
+            
+            // Add to container inventory
+            int remaining = quantity;
+            
+            foreach (var slot in containerInventory)
+            {
+                if (slot != null && slot.CanStack(item))
+                {
+                    remaining = slot.AddToStack(remaining);
+                    if (remaining <= 0)
+                        return true;
+                }
+            }
+            
+            while (remaining > 0 && containerInventory.Count < GetTotalContainerCapacity())
+            {
+                int stackSize = Mathf.Min(remaining, item.MaxStackSize);
+                containerInventory.Add(new InventorySlot(item, stackSize));
+                remaining -= stackSize;
+            }
+            
+            return true;
+        }
+
+        /// <summary>
+        /// Upgrade the maximum number of container slots.
+        /// </summary>
+        public void UpgradeContainerSlots(int newMax)
+        {
+            if (newMax > maxContainerSlots)
+            {
+                Array.Resize(ref containerSlots, newMax);
+                maxContainerSlots = newMax;
+                Debug.Log($"Container slots upgraded to {newMax}");
+            }
+        }
+
+        /// <summary>
+        /// Spend Aurum Shards.
+        /// Returns true if successful, false if insufficient balance.
+        /// </summary>
+        public bool SpendAurumShards(int amount)
+        {
+            if (amount <= 0 || aurumShards < amount)
+                return false;
+            
+            aurumShards -= amount;
+            Debug.Log($"{unitName} spent {amount} Aurum Shards. Remaining: {aurumShards}");
+            return true;
+        }
+
+        /// <summary>
+        /// Gain Aurum Shards.
+        /// </summary>
+        public void GainAurumShards(int amount)
+        {
+            if (amount <= 0)
+                return;
+            
+            aurumShards += amount;
+            Debug.Log($"{unitName} gained {amount} Aurum Shards. Total: {aurumShards}");
+        }
+
+        /// <summary>
+        /// Distribute an item among party members.
+        /// </summary>
+        public void DistributeItem(Item item, int totalQuantity, List<Unit> partyMembers)
+        {
+            if (partyMembers == null || partyMembers.Count == 0)
+                return;
+            
+            if (!HasItem(item, totalQuantity))
+            {
+                Debug.LogWarning($"Insufficient {item.ItemName} to distribute!");
+                return;
+            }
+            
+            RemoveItem(item, totalQuantity);
+            
+            int perMember = totalQuantity / partyMembers.Count;
+            int remainder = totalQuantity % partyMembers.Count;
+            
+            for (int i = 0; i < partyMembers.Count; i++)
+            {
+                int amount = perMember + (i < remainder ? 1 : 0);
+                partyMembers[i].AddItem(item, amount);
+            }
+            
+            Debug.Log($"Distributed {totalQuantity} {item.ItemName} among {partyMembers.Count} party members");
+        }
+
+        #endregion
+
         /// <summary>
         /// Spend movement points (called after moving N cells).
         /// Returns true if movement was allowed, false if not enough points.
@@ -1298,6 +1848,47 @@ namespace Riftbourne.Characters
                 // For now, status effects will be applied as they occur in battle
             }
 
+            // Sync inventory from CharacterState
+            inventory.Clear();
+            if (state.Inventory != null)
+            {
+                foreach (var slot in state.Inventory)
+                {
+                    if (slot != null && slot.Item != null && !slot.IsEmpty())
+                    {
+                        inventory.Add(new InventorySlot(slot.Item, slot.Quantity));
+                    }
+                }
+            }
+
+            containerInventory.Clear();
+            if (state.ContainerInventory != null)
+            {
+                foreach (var slot in state.ContainerInventory)
+                {
+                    if (slot != null && slot.Item != null && !slot.IsEmpty())
+                    {
+                        containerInventory.Add(new InventorySlot(slot.Item, slot.Quantity));
+                    }
+                }
+            }
+
+            // Copy container slots
+            if (state.ContainerSlots != null)
+            {
+                if (containerSlots == null || containerSlots.Length != state.ContainerSlots.Length)
+                {
+                    containerSlots = new ContainerItem[state.ContainerSlots.Length];
+                }
+                for (int i = 0; i < containerSlots.Length && i < state.ContainerSlots.Length; i++)
+                {
+                    containerSlots[i] = state.ContainerSlots[i];
+                }
+            }
+
+            // Copy currency
+            aurumShards = state.AurumShards;
+
             Debug.Log($"Unit {unitName}: Updated from CharacterState {state.CharacterID}");
         }
 
@@ -1317,6 +1908,114 @@ namespace Riftbourne.Characters
             state.UpdateFromUnit(this);
 
             Debug.Log($"Unit {unitName}: Exported state to CharacterState {state.CharacterID}");
+        }
+
+        /// <summary>
+        /// Sync inventory from Unit back to CharacterState.
+        /// Called after battle ends or when returning to exploration to persist inventory changes.
+        /// </summary>
+        public void SyncInventoryToCharacterState()
+        {
+            if (characterState == null)
+            {
+                Debug.LogWarning($"Unit {unitName}: Cannot sync inventory - CharacterState is null!");
+                return;
+            }
+
+            // Clear and copy inventory back to CharacterState
+            characterState.ClearInventory();
+            foreach (var slot in inventory)
+            {
+                if (slot != null && slot.Item != null && !slot.IsEmpty())
+                {
+                    characterState.AddItem(slot.Item, slot.Quantity);
+                }
+            }
+
+            // Clear and copy container inventory
+            characterState.ClearContainerInventory();
+            foreach (var slot in containerInventory)
+            {
+                if (slot != null && slot.Item != null && !slot.IsEmpty())
+                {
+                    characterState.AddToContainerInventory(slot.Item, slot.Quantity);
+                }
+            }
+
+            // Copy container slots
+            characterState.SetContainerSlots(containerSlots);
+
+            // Copy currency
+            characterState.SetAurumShards(aurumShards);
+
+            Debug.Log($"Unit {unitName}: Synced inventory to CharacterState {characterState.CharacterID}");
+        }
+
+        #endregion
+
+        #region Debug Helpers
+
+        [ContextMenu("Debug: Show Inventory")]
+        public void DebugShowInventory()
+        {
+            Debug.Log($"=== {unitName} Inventory ===");
+            Debug.Log($"Aurum Shards: {aurumShards}");
+            Debug.Log($"Weight: {CurrentWeight:F2} / {EffectiveCarryCapacity:F2} kg ({EncumbrancePercent:P0})");
+            Debug.Log($"Encumbered: {IsOverencumbered}");
+            
+            Debug.Log("\nMain Inventory:");
+            foreach (var slot in inventory)
+            {
+                if (slot != null && slot.Item != null)
+                    Debug.Log($"  {slot.Item.ItemName} x{slot.Quantity} ({slot.GetTotalWeight():F2} kg)");
+            }
+            
+            Debug.Log("\nContainer Slots:");
+            for (int i = 0; i < containerSlots.Length; i++)
+            {
+                var container = containerSlots[i];
+                Debug.Log($"  Slot {i}: {(container != null ? container.ItemName : "Empty")}");
+            }
+            
+            if (containerInventory.Count > 0)
+            {
+                Debug.Log("\nContainer Inventory:");
+                foreach (var slot in containerInventory)
+                {
+                    if (slot != null && slot.Item != null)
+                    {
+                        float reducedWeight = slot.GetTotalWeight() * (1f - GetContainerReduction());
+                        Debug.Log($"  {slot.Item.ItemName} x{slot.Quantity} ({reducedWeight:F2} kg after reduction)");
+                    }
+                }
+            }
+        }
+
+        [ContextMenu("Debug: Add 100 Aurum Shards")]
+        public void DebugAddCurrency()
+        {
+            GainAurumShards(100);
+        }
+
+        [ContextMenu("Debug: Overencumber")]
+        public void DebugOverencumber()
+        {
+            // Add heavy items to test encumbrance
+            // Use reflection to set protected fields for debug purposes
+            var dummyItem = ScriptableObject.CreateInstance<LootItem>();
+            var itemNameField = typeof(Item).GetField("itemName", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var weightField = typeof(Item).GetField("weight", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            if (itemNameField != null && weightField != null)
+            {
+                itemNameField.SetValue(dummyItem, "Heavy Rock");
+                weightField.SetValue(dummyItem, 50f);
+                AddItem(dummyItem, 5);
+            }
+            else
+            {
+                Debug.LogWarning("DebugOverencumber: Could not set item fields via reflection. Create a test item manually.");
+            }
         }
 
         #endregion

@@ -63,7 +63,134 @@ namespace Riftbourne.Core
                 return;
             }
 
-            // Collect all Unit states
+            // Show victory notification → spoils → loot → transition flow
+            StartCoroutine(VictoryFlowCoroutine());
+        }
+        
+        /// <summary>
+        /// Coroutine handling the victory flow: notification → spoils → loot → transition.
+        /// </summary>
+        private System.Collections.IEnumerator VictoryFlowCoroutine()
+        {
+            Debug.Log("BattleEndHandler: Starting victory flow coroutine");
+            
+            // Step 1: Show victory notification
+            // Use FindObjectsByType with IncludeInactive to find inactive GameObjects
+            Riftbourne.UI.VictoryNotificationUI[] allVictoryUI = FindObjectsByType<Riftbourne.UI.VictoryNotificationUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Riftbourne.UI.VictoryNotificationUI victoryUI = allVictoryUI != null && allVictoryUI.Length > 0 ? allVictoryUI[0] : null;
+            
+            Debug.Log($"BattleEndHandler: Searching for VictoryNotificationUI... Found {allVictoryUI?.Length ?? 0} instance(s)");
+            
+            if (victoryUI != null)
+            {
+                Debug.Log($"BattleEndHandler: Found VictoryNotificationUI on GameObject '{victoryUI.gameObject.name}', showing notification");
+                bool notificationAcknowledged = false;
+                victoryUI.ShowVictory(() => { notificationAcknowledged = true; });
+                
+                // Wait for acknowledgment
+                while (!notificationAcknowledged)
+                {
+                    yield return null;
+                }
+                Debug.Log("BattleEndHandler: Victory notification acknowledged");
+            }
+            else
+            {
+                Debug.LogWarning("BattleEndHandler: VictoryNotificationUI not found in scene! Skipping victory notification.");
+                Debug.LogWarning("BattleEndHandler: Make sure VictoryNotificationUI component exists in the scene (can be on inactive GameObject).");
+            }
+            
+            // Step 2: Show spoils screen
+            Riftbourne.UI.BattleSpoilsUI[] allSpoilsUI = FindObjectsByType<Riftbourne.UI.BattleSpoilsUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Riftbourne.UI.BattleSpoilsUI spoilsUI = allSpoilsUI != null && allSpoilsUI.Length > 0 ? allSpoilsUI[0] : null;
+            
+            Debug.Log($"BattleEndHandler: Searching for BattleSpoilsUI... Found {allSpoilsUI?.Length ?? 0} instance(s)");
+            
+            if (spoilsUI != null && BattleStatisticsTracker.Instance != null)
+            {
+                Debug.Log($"BattleEndHandler: Found BattleSpoilsUI on GameObject '{spoilsUI.gameObject.name}', showing spoils");
+                bool spoilsAcknowledged = false;
+                spoilsUI.ShowSpoils(BattleStatisticsTracker.Instance.Statistics, () => { spoilsAcknowledged = true; });
+                
+                // Wait for acknowledgment
+                while (!spoilsAcknowledged)
+                {
+                    yield return null;
+                }
+                Debug.Log("BattleEndHandler: Spoils screen acknowledged");
+            }
+            else
+            {
+                if (spoilsUI == null)
+                {
+                    Debug.LogWarning("BattleEndHandler: BattleSpoilsUI not found in scene! Skipping spoils screen.");
+                    Debug.LogWarning("BattleEndHandler: Make sure BattleSpoilsUI component exists in the scene (can be on inactive GameObject).");
+                }
+                if (BattleStatisticsTracker.Instance == null)
+                {
+                    Debug.LogWarning("BattleEndHandler: BattleStatisticsTracker.Instance is null! Skipping spoils screen.");
+                }
+            }
+            
+            // Step 3: Show loot selection
+            Riftbourne.UI.LootSelectionUI[] allLootUI = FindObjectsByType<Riftbourne.UI.LootSelectionUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            Riftbourne.UI.LootSelectionUI lootUI = allLootUI != null && allLootUI.Length > 0 ? allLootUI[0] : null;
+            
+            Debug.Log($"BattleEndHandler: Searching for LootSelectionUI... Found {allLootUI?.Length ?? 0} instance(s)");
+            
+            if (lootUI != null && LootManager.Instance != null)
+            {
+                Debug.Log($"BattleEndHandler: Found LootSelectionUI on GameObject '{lootUI.gameObject.name}', checking for loot");
+                // Get loot from LootManager using public methods
+                List<Riftbourne.Inventory.InventorySlot> loot = LootManager.Instance.GetBattleLoot();
+                int currency = LootManager.Instance.GetBattleCurrency();
+                
+                Debug.Log($"BattleEndHandler: Loot count: {loot?.Count ?? 0}, Currency: {currency}");
+                
+                // Always show loot selection, even if empty (so player can see there's no loot)
+                // But log if there's nothing to show
+                if (loot == null || (loot.Count == 0 && currency == 0))
+                {
+                    Debug.Log("BattleEndHandler: No loot or currency to display, but showing loot selection anyway");
+                }
+                
+                Debug.Log("BattleEndHandler: Calling ShowLoot on LootSelectionUI");
+                bool lootComplete = false;
+                lootUI.ShowLoot(loot ?? new List<Riftbourne.Inventory.InventorySlot>(), currency, () => 
+                { 
+                    Debug.Log("BattleEndHandler: LootSelectionUI onComplete callback invoked");
+                    lootComplete = true; 
+                });
+                
+                Debug.Log($"BattleEndHandler: Waiting for loot selection to complete. lootComplete = {lootComplete}");
+                
+                // Wait for loot selection
+                int waitFrames = 0;
+                while (!lootComplete)
+                {
+                    yield return null;
+                    waitFrames++;
+                    if (waitFrames % 60 == 0) // Log every 60 frames (~1 second)
+                    {
+                        Debug.Log($"BattleEndHandler: Still waiting for loot selection... (waited {waitFrames} frames)");
+                    }
+                }
+                Debug.Log("BattleEndHandler: Loot selection complete");
+            }
+            else
+            {
+                if (lootUI == null)
+                {
+                    Debug.LogWarning("BattleEndHandler: LootSelectionUI not found in scene! Skipping loot selection.");
+                    Debug.LogWarning("BattleEndHandler: Make sure LootSelectionUI component exists in the scene (can be on inactive GameObject).");
+                }
+                if (LootManager.Instance == null)
+                {
+                    Debug.LogWarning("BattleEndHandler: LootManager.Instance is null! Skipping loot selection.");
+                }
+            }
+            
+            // Step 4: Update party and transition
             List<Unit> battleUnits = new List<Unit>();
             if (PartyManager.Instance != null)
             {
@@ -98,7 +225,7 @@ namespace Riftbourne.Core
                 }
 
                 // Transition back to exploration after delay
-                StartCoroutine(TransitionToExplorationCoroutine());
+                yield return StartCoroutine(TransitionToExplorationCoroutine());
             }
             else
             {

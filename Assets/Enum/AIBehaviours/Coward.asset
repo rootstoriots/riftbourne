@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8b62241e2f1a8ff4793c67da79e29d3f, type: 3}
   m_Name: Coward
   m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Combat.AI.AIBehaviorData
-  behaviorType: 0
+  behaviorType: 2
   lowHPWeight: 0.5
   proximityWeight: 0.3
   threatWeight: 0.2

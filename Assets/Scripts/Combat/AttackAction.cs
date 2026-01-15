@@ -1,6 +1,7 @@
 using UnityEngine;
 using Riftbourne.Characters;
 using Riftbourne.Core;
+using Riftbourne.Items;
 
 namespace Riftbourne.Combat
 {
@@ -132,6 +133,32 @@ namespace Riftbourne.Combat
             // Apply damage (already calculated with defense by CombatCalculator)
             int damageDealt = target.TakeDamageDirect(result.FinalDamage);
             
+            // Raise critical hit event if applicable
+            if (result.CriticalHit && !result.CriticalDefense)
+            {
+                GameEvents.RaiseCriticalHit(attacker, target, damageDealt);
+            }
+            
+            // Track damage and critical hits for statistics
+            if (BattleStatisticsTracker.Instance != null)
+            {
+                BattleStatisticsTracker.Instance.RecordDamage(attacker, target, damageDealt, result.CriticalHit && !result.CriticalDefense);
+            }
+            
+            // Add durability loss to weapon
+            if (attacker.UnitEquipment != null && attacker.UnitEquipment.EquippedItems.TryGetValue(EquipmentSlot.MeleeWeapon, out var weapon))
+            {
+                if (weapon is EquipmentItem equipItem)
+                {
+                    equipItem.LoseDurability(1.0f);
+                    
+                    if (equipItem.IsBroken)
+                    {
+                        Debug.LogWarning($"{attacker.UnitName}'s {equipItem.ItemName} is broken!");
+                    }
+                }
+            }
+            
             string damageMessage = $"Attack dealt {damageDealt} damage";
             if (result.CriticalHit && !result.CriticalDefense)
             {
@@ -250,6 +277,32 @@ namespace Riftbourne.Combat
             
             // Apply damage (already calculated with defense by CombatCalculator)
             int damageDealt = target.TakeDamageDirect(result.FinalDamage);
+            
+            // Raise critical hit event if applicable
+            if (result.CriticalHit && !result.CriticalDefense)
+            {
+                GameEvents.RaiseCriticalHit(attacker, target, damageDealt);
+            }
+            
+            // Track damage and critical hits for statistics
+            if (BattleStatisticsTracker.Instance != null)
+            {
+                BattleStatisticsTracker.Instance.RecordDamage(attacker, target, damageDealt, result.CriticalHit && !result.CriticalDefense);
+            }
+            
+            // Add durability loss to weapon
+            if (attacker.UnitEquipment != null && attacker.UnitEquipment.EquippedItems.TryGetValue(EquipmentSlot.RangedWeapon, out var weapon))
+            {
+                if (weapon is EquipmentItem equipItem)
+                {
+                    equipItem.LoseDurability(1.0f);
+                    
+                    if (equipItem.IsBroken)
+                    {
+                        Debug.LogWarning($"{attacker.UnitName}'s {equipItem.ItemName} is broken!");
+                    }
+                }
+            }
             
             string damageMessage = $"Ranged attack dealt {damageDealt} damage";
             if (result.CriticalHit && !result.CriticalDefense)

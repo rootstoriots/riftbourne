@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using Riftbourne.Characters;
 using Riftbourne.Exploration;
+using Riftbourne.Combat;
 using System.Collections.Generic;
 
 namespace Riftbourne.Core
@@ -22,7 +23,9 @@ namespace Riftbourne.Core
         /// <summary>
         /// Export party data from PartyManager and load battle scene.
         /// </summary>
-        public void LoadBattleScene(string sceneName = null)
+        /// <param name="sceneName">Optional scene name override</param>
+        /// <param name="encounterData">Optional encounter data to use for the battle</param>
+        public void LoadBattleScene(string sceneName = null, EncounterData encounterData = null)
         {
             if (PartyManager.Instance == null)
             {
@@ -63,6 +66,7 @@ namespace Riftbourne.Core
             transitionData.ReturnSceneName = SceneManager.GetActiveScene().name;
             transitionData.BattleSceneName = sceneName ?? battleSceneName;
             transitionData.ExplorationPosition = playerPosition;
+            transitionData.EncounterData = encounterData; // Store encounter data if provided
 
             Debug.Log($"BattleSceneLoader: Exporting {party.Count} party members to battle scene {transitionData.BattleSceneName}");
 

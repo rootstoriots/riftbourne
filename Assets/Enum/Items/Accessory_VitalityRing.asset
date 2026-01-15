@@ -9,15 +9,21 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 46eab276b8fd0af459aef26b314ec6d0, type: 3}
+  m_Script: {fileID: 11500000, guid: fbae774c4da655c4088d3bc228fcbe56, type: 3}
   m_Name: Accessory_VitalityRing
   m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Characters.EquipmentItem
-  itemName: 
+  itemName: Vitality Ring
   description: 
+  icon: {fileID: 0}
+  rarity: 0
+  weight: 0.05
+  baseValue: 35
+  maxStackSize: 1
   compatibleSlots: 0300000004000000
   meleeWeaponType: 0
   rangedWeaponType: 0
   armorType: 0
+  rangeBonus: 0
   grantedSkills: []
   grantedPassiveSkills:
   - {fileID: 11400000, guid: b360646c0cc2bc84cbc93c40307552f6, type: 2}
@@ -29,3 +35,5 @@ MonoBehaviour:
   speedBonus: 0
   luckBonus: 0
   maxHPBonusPercent: 0
+  currentDurability: 0
+  maxDurability: 0

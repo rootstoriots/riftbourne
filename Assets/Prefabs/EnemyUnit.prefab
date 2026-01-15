@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 6189617795732575617}
   - component: {fileID: 5032910207788555657}
   - component: {fileID: -4084713091064031601}
+  - component: {fileID: 3822047791333590718}
   m_Layer: 0
   m_Name: EnemyUnit
   m_TagString: Untagged
@@ -132,7 +133,7 @@ MonoBehaviour:
   gridX: 0
   gridY: 0
   movementRange: 5
-  maxHP: 80
+  maxHP: 25
   currentHP: 0
   attackPower: 15
   defensePower: 3
@@ -150,8 +151,16 @@ MonoBehaviour:
   accessory1: {fileID: 0}
   accessory2: {fileID: 0}
   codex: {fileID: 0}
+  inventory: []
+  containerInventory: []
+  containerSlots:
+  - {fileID: 0}
+  - {fileID: 0}
+  maxContainerSlots: 2
+  aurumShards: 200
   unitName: Enemy
   isPlayerControlled: 0
+  portrait: {fileID: 21300000, guid: d0ea2ec653dd331458a02626c7a02955, type: 3}
   factionData: {fileID: 11400000, guid: cfce2e28519af6140b312e9ee6d3b9de, type: 2}
   faction: 0
   unitType: 1
@@ -159,6 +168,39 @@ MonoBehaviour:
   currentXP: 0
   skillPoints: 0
   totalActions: 0
+  characterState:
+    characterID: GenericEnemy
+    currentStrength: 2
+    currentFinesse: 2
+    currentFocus: 2
+    currentSpeed: 2
+    currentLuck: 2
+    currentPerception: 2
+    currentInterpretive: 2
+    currentEmpathic: 2
+    level: 1
+    currentXP: 0
+    skillPoints: 0
+    totalActions: 0
+    lastSPAwardedAtAction: 0
+    currentHP: 0
+    maxHP: 25
+    activeStatusEffectIDs: []
+    equippedItemIDs:
+      keys: 
+      values: []
+    knownSkillNames: []
+    masteredSkillNames: []
+    masteredPassiveSkillNames: []
+    weaponProficiencies:
+      keys: 
+      values: []
+    inventory:
+    - item: {fileID: 11400000, guid: 1da30ce30d3e8c14cb3898013d918e3f, type: 2}
+      quantity: 0
+    containerInventory: []
+    containerSlots: []
+    aurumShards: 200
 --- !u!114 &-4084713091064031601
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -174,3 +216,18 @@ MonoBehaviour:
   unit: {fileID: 0}
   gridManager: {fileID: 0}
   turnManager: {fileID: 0}
+--- !u!114 &3822047791333590718
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 402787091324160107}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ecc633db7259d28488823a084891b35b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Combat.EnemyLoot
+  lootTables:
+  - {fileID: 11400000, guid: c49d7ecc3f7edfe44b7f1bc6413fa44b, type: 2}
+  dropCurrency: 1

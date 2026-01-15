@@ -12,7 +12,8 @@ namespace Riftbourne.Characters
         Finesse,     // Precision, ranged damage, evasion
         Focus,       // Mental power, magic damage, resistance
         Speed,       // Turn order (higher = goes first)
-        Luck         // Critical chance, item drops
+        Luck,        // Critical chance, item drops
+        MaxHP        // Maximum health points
     }
 }
 

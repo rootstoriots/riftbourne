@@ -1,5 +1,7 @@
 using UnityEngine;
 using Riftbourne.Skills;
+using Riftbourne.Items;
+using Riftbourne.Inventory;
 using System.Collections.Generic;
 
 namespace Riftbourne.Characters
@@ -46,6 +48,12 @@ namespace Riftbourne.Characters
         [Tooltip("Optional starting equipment")]
         [SerializeField] private List<EquipmentItem> startingEquipment = new List<EquipmentItem>();
 
+        [Header("Starting Inventory")]
+        [Tooltip("Optional starting inventory items")]
+        [SerializeField] private List<InventorySlot> startingInventory = new List<InventorySlot>();
+        [Tooltip("Starting Aurum Shards (currency)")]
+        [SerializeField] private int startingAurumShards = 0;
+
         [Header("Character Metadata")]
         [Tooltip("Can this character be the protagonist (POV character)?")]
         [SerializeField] private bool isPOVCharacter = false;
@@ -86,6 +94,10 @@ namespace Riftbourne.Characters
         // Skills and equipment
         public List<Skill> AvailableSkills => new List<Skill>(availableSkills);
         public List<EquipmentItem> StartingEquipment => new List<EquipmentItem>(startingEquipment);
+
+        // Starting inventory
+        public List<InventorySlot> StartingInventory => new List<InventorySlot>(startingInventory);
+        public int StartingAurumShards => startingAurumShards;
 
         // Metadata
         public bool IsPOVCharacter => isPOVCharacter;

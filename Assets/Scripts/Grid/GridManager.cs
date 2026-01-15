@@ -12,6 +12,8 @@ namespace Riftbourne.Grid
         [SerializeField] private int gridWidth = 10;
         [SerializeField] private int gridHeight = 10;
         [SerializeField] private float cellSize = 1f;
+        [Tooltip("If true, automatically generates default grid on Start (for backward compatibility)")]
+        [SerializeField] private bool autoGenerateOnStart = true;
 
         [Header("Visual Settings")]
         [SerializeField] private Material lineMaterial;
@@ -25,22 +27,30 @@ namespace Riftbourne.Grid
         private GridCell[,] grid;
         private GameObject gridVisualsParent;
         private Pathfinding pathfinding;
+        private Vector3 gridOrigin = Vector3.zero;
 
         // Selection
         private GridCell selectedCell;
         private GameObject selectionHighlight;
+
+        // Obstruction visuals
+        private List<GameObject> obstructionVisuals = new List<GameObject>();
 
         // Input
         private PlayerInputActions inputActions;
 
         // Camera service reference
         private CameraService cameraService;
+        
+        // UI blocking flag - when true, grid input is disabled
+        private bool inputBlocked = false;
 
         public static GridManager Instance { get; private set; }
 
         public int GridWidth => gridWidth;
         public int GridHeight => gridHeight;
         public float CellSize => cellSize;
+        public bool IsGridInitialized => grid != null;
 
         private void Awake()
         {
@@ -59,10 +69,11 @@ namespace Riftbourne.Grid
 
             inputActions = new PlayerInputActions();
 
-            GenerateGrid();
-            pathfinding = new Pathfinding(this);
-            CreateGridVisuals();
-            CreateSelectionHighlight();
+            // Only auto-generate if flag is set (for backward compatibility)
+            if (autoGenerateOnStart)
+            {
+                GenerateGrid(gridWidth, gridHeight, Vector3.zero);
+            }
 
             // Get camera service
             cameraService = CameraService.Instance;
@@ -85,11 +96,49 @@ namespace Riftbourne.Grid
 
         private void Update()
         {
-            HandleCellSelection();
+            // Only handle cell selection if input is not blocked (e.g., by UI)
+            if (!inputBlocked)
+            {
+                HandleCellSelection();
+            }
+        }
+        
+        /// <summary>
+        /// Block grid input processing (e.g., when UI is showing).
+        /// </summary>
+        public void BlockInput(bool block)
+        {
+            inputBlocked = block;
+            Debug.Log($"GridManager: Input blocked = {block}");
+        }
+        
+        /// <summary>
+        /// Show or hide grid visuals.
+        /// </summary>
+        public void SetGridVisualsVisible(bool visible)
+        {
+            if (gridVisualsParent != null)
+            {
+                gridVisualsParent.SetActive(visible);
+                Debug.Log($"GridManager: Grid visuals visible = {visible}");
+            }
         }
 
-        private void GenerateGrid()
+        /// <summary>
+        /// Generate grid with specified dimensions and origin position.
+        /// Clears existing grid before generating new one.
+        /// </summary>
+        public void GenerateGrid(int width, int height, Vector3 origin)
         {
+            // Clear existing grid first
+            ClearGrid();
+
+            // Update grid dimensions
+            gridWidth = width;
+            gridHeight = height;
+            gridOrigin = origin;
+
+            // Create new grid array
             grid = new GridCell[gridWidth, gridHeight];
 
             for (int x = 0; x < gridWidth; x++)
@@ -97,7 +146,8 @@ namespace Riftbourne.Grid
                 for (int y = 0; y < gridHeight; y++)
                 {
                     // Center cells within grid squares (0.5, 1.5, 2.5, etc.)
-                    Vector3 worldPosition = new Vector3(
+                    // Position relative to origin
+                    Vector3 worldPosition = origin + new Vector3(
                         x * cellSize + cellSize * 0.5f, 
                         0, 
                         y * cellSize + cellSize * 0.5f
@@ -106,13 +156,66 @@ namespace Riftbourne.Grid
                 }
             }
 
-            Debug.Log($"Grid generated: {gridWidth}x{gridHeight} cells");
+            // Create visuals and pathfinding
+            CreateGridVisuals();
+            CreateSelectionHighlight();
+            pathfinding = new Pathfinding(this);
+
+            Debug.Log($"Grid generated: {gridWidth}x{gridHeight} cells at origin {origin}");
+        }
+
+        /// <summary>
+        /// Clear the grid, destroying all visuals and resetting state.
+        /// </summary>
+        public void ClearGrid()
+        {
+            // Destroy grid visuals (use Destroy, not DestroyImmediate, to avoid memory corruption)
+            if (gridVisualsParent != null)
+            {
+                Destroy(gridVisualsParent);
+                gridVisualsParent = null;
+            }
+
+            // Destroy selection highlight
+            if (selectionHighlight != null)
+            {
+                Destroy(selectionHighlight);
+                selectionHighlight = null;
+            }
+
+            // Destroy obstruction visuals
+            foreach (GameObject obstruction in obstructionVisuals)
+            {
+                if (obstruction != null)
+                {
+                    Destroy(obstruction);
+                }
+            }
+            obstructionVisuals.Clear();
+
+            // Clear grid array
+            grid = null;
+
+            // Reset selection
+            selectedCell = null;
+
+            // Reset pathfinding
+            pathfinding = null;
+
+            Debug.Log("Grid cleared");
         }
 
         private void CreateGridVisuals()
         {
+            if (grid == null)
+            {
+                Debug.LogWarning("Cannot create grid visuals - grid is null!");
+                return;
+            }
+
             gridVisualsParent = new GameObject("Grid Visuals");
             gridVisualsParent.transform.parent = transform;
+            gridVisualsParent.transform.position = gridOrigin;
 
             // Create vertical lines (along Z-axis)
             for (int x = 0; x <= gridWidth; x++)
@@ -128,6 +231,7 @@ namespace Riftbourne.Grid
                 line.endWidth = 0.05f;
                 line.positionCount = 2;
 
+                // Position relative to grid origin
                 Vector3 startPos = new Vector3(x * cellSize, 0.01f, 0);
                 Vector3 endPos = new Vector3(x * cellSize, 0.01f, gridHeight * cellSize);
 
@@ -149,6 +253,7 @@ namespace Riftbourne.Grid
                 line.endWidth = 0.05f;
                 line.positionCount = 2;
 
+                // Position relative to grid origin
                 Vector3 startPos = new Vector3(0, 0.01f, y * cellSize);
                 Vector3 endPos = new Vector3(gridWidth * cellSize, 0.01f, y * cellSize);
 
@@ -164,6 +269,7 @@ namespace Riftbourne.Grid
             selectionHighlight = GameObject.CreatePrimitive(PrimitiveType.Quad);
             selectionHighlight.name = "Selection Highlight";
             selectionHighlight.transform.parent = transform;
+            selectionHighlight.transform.position = gridOrigin;
             selectionHighlight.transform.rotation = Quaternion.Euler(90, 0, 0);
             selectionHighlight.transform.localScale = new Vector3(cellSize * 0.9f, cellSize * 0.9f, 1);
 
@@ -208,8 +314,10 @@ namespace Riftbourne.Grid
                 if (Physics.Raycast(ray, out hit))
                 {
                     Vector3 hitPoint = hit.point;
-                    int x = Mathf.FloorToInt(hitPoint.x / cellSize);
-                    int z = Mathf.FloorToInt(hitPoint.z / cellSize);
+                    // Account for grid origin offset
+                    Vector3 relativePoint = hitPoint - gridOrigin;
+                    int x = Mathf.FloorToInt(relativePoint.x / cellSize);
+                    int z = Mathf.FloorToInt(relativePoint.z / cellSize);
 
                     if (IsValidGridPosition(x, z))
                     {
@@ -241,6 +349,12 @@ namespace Riftbourne.Grid
 
         public GridCell GetCell(int x, int y)
         {
+            // Check if grid exists
+            if (grid == null)
+            {
+                return null;
+            }
+            
             if (IsValidGridPosition(x, y))
             {
                 return grid[x, y];
@@ -250,12 +364,18 @@ namespace Riftbourne.Grid
 
         public bool IsValidGridPosition(int x, int y)
         {
+            // Check if grid exists
+            if (grid == null)
+            {
+                return false;
+            }
+            
             return x >= 0 && x < gridWidth && y >= 0 && y < gridHeight;
         }
 
         public Vector3 GetCenterPosition()
         {
-            return new Vector3(
+            return gridOrigin + new Vector3(
                 (gridWidth * cellSize) / 2f,
                 0,
                 (gridHeight * cellSize) / 2f
@@ -466,6 +586,100 @@ namespace Riftbourne.Grid
             if (rangeVisualizer != null)
             {
                 rangeVisualizer.ClearHighlights();
+            }
+        }
+
+        /// <summary>
+        /// Set whether a grid cell is obstructed (unwalkable).
+        /// Creates or destroys visual indicator as needed.
+        /// </summary>
+        public void SetObstruction(int x, int y, bool isObstructed)
+        {
+            if (!IsValidGridPosition(x, y))
+            {
+                Debug.LogWarning($"Cannot set obstruction at invalid position ({x}, {y})");
+                return;
+            }
+
+            GridCell cell = GetCell(x, y);
+            if (cell == null)
+            {
+                Debug.LogError($"Cell at ({x}, {y}) is null!");
+                return;
+            }
+
+            cell.IsWalkable = !isObstructed;
+
+            if (isObstructed)
+            {
+                CreateObstructionVisual(cell);
+            }
+            else
+            {
+                DestroyObstructionVisual(cell);
+            }
+        }
+
+        /// <summary>
+        /// Create a visual indicator for an obstructed tile.
+        /// </summary>
+        private void CreateObstructionVisual(GridCell cell)
+        {
+            // Check if visual already exists
+            if (cell.VisualObject != null)
+            {
+                return; // Already has visual
+            }
+
+            // Create dark grey cube
+            GameObject obstruction = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            obstruction.name = $"Obstruction_{cell.X}_{cell.Y}";
+            obstruction.transform.parent = transform;
+
+            // Position at cell location, slightly raised
+            Vector3 position = cell.WorldPosition;
+            position.y = 0.5f;
+            obstruction.transform.position = position;
+
+            // Scale to cell size (slightly smaller)
+            obstruction.transform.localScale = new Vector3(cellSize * 0.9f, 0.3f, cellSize * 0.9f);
+
+            // Create dark grey material
+            Material obstructionMat = new Material(Shader.Find("Standard"));
+            obstructionMat.color = new Color(0.3f, 0.3f, 0.3f, 0.8f);
+            obstruction.GetComponent<Renderer>().material = obstructionMat;
+
+            // Remove collider (we don't need physics)
+            Destroy(obstruction.GetComponent<Collider>());
+
+            // Store reference
+            cell.VisualObject = obstruction;
+            obstructionVisuals.Add(obstruction);
+
+            Debug.Log($"Created obstruction visual at ({cell.X}, {cell.Y})");
+        }
+
+        /// <summary>
+        /// Destroy the visual indicator for an obstructed tile.
+        /// </summary>
+        private void DestroyObstructionVisual(GridCell cell)
+        {
+            if (cell.VisualObject == null)
+            {
+                return; // No visual to destroy
+            }
+
+            GameObject visual = cell.VisualObject;
+            cell.VisualObject = null;
+
+            if (obstructionVisuals.Contains(visual))
+            {
+                obstructionVisuals.Remove(visual);
+            }
+
+            if (visual != null)
+            {
+                Destroy(visual);
             }
         }
     }

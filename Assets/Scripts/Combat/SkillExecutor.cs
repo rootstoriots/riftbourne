@@ -3,6 +3,7 @@ using Riftbourne.Characters;
 using Riftbourne.Skills;
 using Riftbourne.Grid;
 using Riftbourne.Core;
+using Riftbourne.Items;
 using System.Collections.Generic;
 
 namespace Riftbourne.Combat
@@ -129,6 +130,15 @@ namespace Riftbourne.Combat
                 ApplySkillEffectsToTarget(skill, user, target, proficiencyTier);
             }
 
+            // Raise skill used event
+            GameEvents.RaiseSkillUsed(user, skill, target);
+            
+            // Track skill usage for statistics
+            if (BattleStatisticsTracker.Instance != null)
+            {
+                BattleStatisticsTracker.Instance.RecordSkillUsed(user);
+            }
+            
             // Record action for SP system
             user.RecordAction();
 
@@ -222,6 +232,15 @@ namespace Riftbourne.Combat
                 }
             }
 
+            // Raise skill used event (ground skill, no target)
+            GameEvents.RaiseSkillUsed(user, skill, null);
+            
+            // Track skill usage for statistics
+            if (BattleStatisticsTracker.Instance != null)
+            {
+                BattleStatisticsTracker.Instance.RecordSkillUsed(user);
+            }
+            
             // Record action for SP system
             user.RecordAction();
 
@@ -383,6 +402,12 @@ namespace Riftbourne.Combat
             {
                 int actualDamage = target.TakeDamage(damage);
                 Debug.Log($"{skill.SkillName} deals {actualDamage} damage to {target.UnitName}!");
+                
+                // Track damage for statistics (skills don't have crits currently)
+                if (BattleStatisticsTracker.Instance != null)
+                {
+                    BattleStatisticsTracker.Instance.RecordDamage(user, target, actualDamage, false);
+                }
             }
 
             // Apply status effect using StatusEffectData

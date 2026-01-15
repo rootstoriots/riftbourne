@@ -3,6 +3,7 @@ using UnityEngine.InputSystem;
 using Riftbourne.Core;
 using Riftbourne.Characters;
 using Riftbourne.Skills;
+using Riftbourne.Combat;
 
 namespace Riftbourne.Exploration
 {
@@ -18,6 +19,7 @@ namespace Riftbourne.Exploration
         [SerializeField] private float moveSpeed = 5f;
         [SerializeField] private float sprintMultiplier = 1.8f;
         [SerializeField] private float acceleration = 10f;
+        [SerializeField] private float rotationSpeed = 10f; // Speed at which character rotates to face movement direction
         
         [Header("Click-to-Move Settings")]
         [SerializeField] private bool enableClickToMove = true;
@@ -32,6 +34,14 @@ namespace Riftbourne.Exploration
         [SerializeField] private Transform cameraTransform;
         [SerializeField] private BattleSceneLoader battleSceneLoader; // Optional: assign manually, or will be found automatically
         
+        [Header("Animation")]
+        [Tooltip("Animator component for character animations. If not assigned, will search in children.")]
+        [SerializeField] private Animator animator;
+        
+        [Header("Battle Trigger Settings")]
+        [Tooltip("Default encounter to use when F2 is pressed (for testing). Leave empty to load from Resources/Encounters/DefaultEncounter")]
+        [SerializeField] private EncounterData defaultEncounter;
+        
         [Header("Debug")]
         [SerializeField] private bool showDebugInfo = true;
         
@@ -45,6 +55,7 @@ namespace Riftbourne.Exploration
         private bool isSprinting;
         private bool wasMoving;
         private float currentSpeed;
+        private float stableYPosition; // Store stable Y position to prevent root motion sinking
         
         // Click-to-move state
         private Vector3? clickTargetPosition;
@@ -107,6 +118,48 @@ namespace Riftbourne.Exploration
         {
             characterController = GetComponent<CharacterController>();
             inputActions = new PlayerInputActions();
+            
+            // Find Animator if not assigned
+            if (animator == null)
+            {
+                animator = GetComponent<Animator>();
+                if (animator == null)
+                {
+                    animator = GetComponentInChildren<Animator>();
+                }
+            }
+            
+            // CRITICAL: Disable root motion on ALL Animators in the hierarchy (including self)
+            // This prevents animations from moving the character's transform
+            // Note: This will make "Apply Root Motion" show as "Handled by script" in Inspector - this is correct
+            Animator[] allAnimators = GetComponentsInChildren<Animator>(true); // Include inactive
+            foreach (Animator anim in allAnimators)
+            {
+                anim.applyRootMotion = false;
+                // Build path string for debugging
+                string path = anim.gameObject.name;
+                Transform parent = anim.transform.parent;
+                while (parent != null)
+                {
+                    path = parent.name + "/" + path;
+                    parent = parent.parent;
+                }
+                Debug.Log($"[ROOT MOTION] ExplorationController: Disabled root motion on Animator '{anim.gameObject.name}' (Path: {path})");
+            }
+            
+            // Also disable root motion on the main animator if found
+            if (animator != null)
+            {
+                animator.applyRootMotion = false;
+                Debug.Log($"[ROOT MOTION] ExplorationController: Main animator is on '{animator.gameObject.name}'");
+            }
+            else
+            {
+                Debug.LogWarning("[ROOT MOTION] ExplorationController: No Animator found! Character may not animate.");
+            }
+            
+            // Initialize stable Y position
+            stableYPosition = transform.position.y;
             
             // Restore position IMMEDIATELY in Awake (before player is visible)
             // This prevents the player from appearing at spawn location first
@@ -269,7 +322,19 @@ namespace Riftbourne.Exploration
             }
             
             Debug.Log($"ExplorationController: F2 pressed - Triggering battle with {party.Count} party members");
-            battleSceneLoader.LoadBattleScene();
+            
+            // Get encounter data (use assigned default, or try to load from Resources)
+            EncounterData encounter = defaultEncounter;
+            if (encounter == null)
+            {
+                encounter = Resources.Load<EncounterData>("Encounters/DefaultEncounter");
+                if (encounter == null)
+                {
+                    Debug.LogWarning("ExplorationController: No default encounter assigned and DefaultEncounter not found in Resources/Encounters/. Battle will load without encounter data.");
+                }
+            }
+            
+            battleSceneLoader.LoadBattleScene(null, encounter);
         }
         
         private void HandleClickToMove()
@@ -313,9 +378,12 @@ namespace Riftbourne.Exploration
             float targetSpeed = moveSpeed;
             currentSpeed = Mathf.Lerp(currentSpeed, targetSpeed, acceleration * Time.deltaTime);
             
-            // Apply movement direction
-            velocity.x = direction.x * currentSpeed;
-            velocity.z = direction.z * currentSpeed;
+            // Apply movement direction (only if we have a valid target)
+            if (hasClickTarget)
+            {
+                velocity.x = direction.x * currentSpeed;
+                velocity.z = direction.z * currentSpeed;
+            }
         }
         
         private void HandleMovement()
@@ -354,11 +422,22 @@ namespace Riftbourne.Exploration
             }
             
             // Apply acceleration
-            currentSpeed = Mathf.Lerp(currentSpeed, moveInput.magnitude > 0.1f ? targetSpeed : 0f, acceleration * Time.deltaTime);
+            float targetSpeedValue = moveInput.magnitude > 0.1f ? targetSpeed : 0f;
+            currentSpeed = Mathf.Lerp(currentSpeed, targetSpeedValue, acceleration * Time.deltaTime);
             
-            // Apply movement to velocity (horizontal only, gravity handled separately)
-            velocity.x = moveDirection.x * currentSpeed;
-            velocity.z = moveDirection.z * currentSpeed;
+            // Only apply movement if there's input
+            if (moveInput.magnitude > 0.1f)
+            {
+                // Apply movement to velocity (horizontal only, gravity handled separately)
+                velocity.x = moveDirection.x * currentSpeed;
+                velocity.z = moveDirection.z * currentSpeed;
+            }
+            else
+            {
+                // Decelerate when no input
+                velocity.x = Mathf.Lerp(velocity.x, 0f, acceleration * Time.deltaTime);
+                velocity.z = Mathf.Lerp(velocity.z, 0f, acceleration * Time.deltaTime);
+            }
         }
         
         private void HandleGravity()
@@ -368,6 +447,9 @@ namespace Riftbourne.Exploration
             {
                 // Reset vertical velocity when grounded
                 velocity.y = -2f; // Small negative value to keep grounded
+                
+                // Update stable Y position when grounded (for root motion correction)
+                stableYPosition = transform.position.y;
             }
             else
             {
@@ -378,9 +460,61 @@ namespace Riftbourne.Exploration
         
         private void ApplyMovement()
         {
+            // Calculate horizontal movement direction for rotation
+            Vector3 horizontalVelocity = new Vector3(velocity.x, 0f, velocity.z);
+            
+            // Rotate character to face movement direction (only when moving)
+            if (horizontalVelocity.magnitude > 0.1f)
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(horizontalVelocity.normalized);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+            }
+            
             // Move the character
             Vector3 movement = velocity * Time.deltaTime;
             characterController.Move(movement);
+            
+            // AGGRESSIVE FIX: If root motion is still being applied despite "Bake Into Pose",
+            // force Y position to stay stable when grounded
+            // This is a workaround for animations that have root motion that can't be baked out
+            if (IsGrounded && animator != null)
+            {
+                Vector3 currentPos = transform.position;
+                
+                // If we're not intentionally moving vertically (not jumping/falling)
+                // and Y position has drifted from stable position, correct it
+                if (Mathf.Abs(velocity.y + 2f) < 0.5f) // We're grounded
+                {
+                    float yDrift = currentPos.y - stableYPosition;
+                    
+                    // If Y has drifted more than 0.02 units (root motion interference), correct it
+                    if (Mathf.Abs(yDrift) > 0.02f)
+                    {
+                        currentPos.y = stableYPosition;
+                        transform.position = currentPos;
+                    }
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Called by Unity when Animator has root motion enabled.
+        /// We override this to prevent root motion from being applied automatically.
+        /// CRITICAL: This method MUST exist and be empty to prevent root motion application.
+        /// </summary>
+        private void OnAnimatorMove()
+        {
+            // Completely ignore root motion - don't apply animator.deltaPosition or animator.deltaRotation
+            // By overriding this method and not using animator.deltaPosition, we prevent root motion
+            // However, some animations still apply root motion even with "Bake Into Pose" checked
+            // In that case, we correct it in ApplyMovement() after CharacterController.Move()
+            
+            // If root motion is somehow still enabled, explicitly prevent it
+            if (animator != null && animator.applyRootMotion)
+            {
+                // Don't apply the delta - this prevents root motion
+                // By not calling transform.position += animator.deltaPosition, we block root motion
+            }
         }
         
         private void CheckMovementState()
@@ -398,6 +532,17 @@ namespace Riftbourne.Exploration
             }
             
             wasMoving = isMoving;
+            
+            // Update animator parameters
+            if (animator != null)
+            {
+                // Use horizontal velocity magnitude for Speed parameter (prevents root motion issues)
+                Vector3 horizontalVel = new Vector3(velocity.x, 0f, velocity.z);
+                float speedMagnitude = horizontalVel.magnitude;
+                animator.SetFloat("Speed", speedMagnitude);
+                animator.SetBool("IsSprinting", isSprinting);
+                animator.SetBool("IsGrounded", IsGrounded);
+            }
         }
         
         /// <summary>
@@ -406,6 +551,21 @@ namespace Riftbourne.Exploration
         public void SetCameraTransform(Transform camTransform)
         {
             cameraTransform = camTransform;
+        }
+        
+        /// <summary>
+        /// Helper method to get full GameObject path for debugging.
+        /// </summary>
+        private string GetGameObjectPath(GameObject obj)
+        {
+            string path = obj.name;
+            Transform parent = obj.transform.parent;
+            while (parent != null)
+            {
+                path = parent.name + "/" + path;
+                parent = parent.parent;
+            }
+            return path;
         }
         
         private void OnGUI()

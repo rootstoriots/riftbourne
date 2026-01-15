@@ -9,19 +9,24 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 46eab276b8fd0af459aef26b314ec6d0, type: 3}
+  m_Script: {fileID: 11500000, guid: fbae774c4da655c4088d3bc228fcbe56, type: 3}
   m_Name: Handgun_Revolver
   m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Characters.EquipmentItem
   itemName: Revolver
   description: 
+  icon: {fileID: 0}
+  rarity: 0
+  weight: 0.8
+  baseValue: 150
+  maxStackSize: 1
   compatibleSlots: 01000000
   meleeWeaponType: 0
   rangedWeaponType: 3
   armorType: 0
-  rangeBonus: 3
+  rangeBonus: 5
   grantedSkills: []
   grantedPassiveSkills: []
-  attackBonus: 5
+  attackBonus: 10
   defenseBonus: 0
   strengthBonus: 0
   finesseBonus: 0
@@ -29,4 +34,5 @@ MonoBehaviour:
   speedBonus: 0
   luckBonus: 0
   maxHPBonusPercent: 0
-  icon: {fileID: 21300000, guid: 038748d7fa5f98641800c4153a26fe0a, type: 3}
+  currentDurability: 100
+  maxDurability: 100

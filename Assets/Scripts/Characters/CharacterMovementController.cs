@@ -4,6 +4,7 @@ using Riftbourne.Grid;
 using Riftbourne.Combat;
 using Riftbourne.Skills;
 using Riftbourne.Core;
+using Riftbourne.Items;
 using System.Collections.Generic;
 
 namespace Riftbourne.Characters
@@ -20,6 +21,10 @@ namespace Riftbourne.Characters
 
         // Camera service reference
         private CameraService cameraService;
+        
+        // Consumable selection state
+        private bool isSelectingConsumable = false;
+        private ConsumableItem selectedConsumable = null;
 
         private void Awake()
         {
@@ -50,9 +55,11 @@ namespace Riftbourne.Characters
             {
                 return;
             }
+            
+            bool isPlayerControlled = unit != null && unit.IsPlayerControlled;
 
-            // Only process input if this unit is in the current turn window
-            if (turnManager == null || !turnManager.IsUnitInCurrentWindow(unit))
+            // Only process input if this unit is in the current turn window (unless selecting consumable)
+            if (!isSelectingConsumable && (turnManager == null || !turnManager.IsUnitInCurrentWindow(unit)))
             {
                 // Only log warning once per frame to avoid spam
                 return;
@@ -71,6 +78,33 @@ namespace Riftbourne.Characters
             {
                 Debug.Log("Player manually ended turn");
                 turnManager.EndTurn();
+            }
+            
+            // C key to show consumable menu
+            if (Keyboard.current != null && Keyboard.current.cKey.wasPressedThisFrame && isPlayerControlled)
+            {
+                ShowConsumableMenu();
+            }
+            
+            // Handle consumable selection with number keys
+            if (isSelectingConsumable && Keyboard.current != null)
+            {
+                // Number keys 1-9 to select consumable
+                if (Keyboard.current.digit1Key.wasPressedThisFrame) SelectConsumable(0);
+                else if (Keyboard.current.digit2Key.wasPressedThisFrame) SelectConsumable(1);
+                else if (Keyboard.current.digit3Key.wasPressedThisFrame) SelectConsumable(2);
+                else if (Keyboard.current.digit4Key.wasPressedThisFrame) SelectConsumable(3);
+                else if (Keyboard.current.digit5Key.wasPressedThisFrame) SelectConsumable(4);
+                else if (Keyboard.current.digit6Key.wasPressedThisFrame) SelectConsumable(5);
+                else if (Keyboard.current.digit7Key.wasPressedThisFrame) SelectConsumable(6);
+                else if (Keyboard.current.digit8Key.wasPressedThisFrame) SelectConsumable(7);
+                else if (Keyboard.current.digit9Key.wasPressedThisFrame) SelectConsumable(8);
+                
+                // ESC to cancel
+                if (Keyboard.current.escapeKey.wasPressedThisFrame)
+                {
+                    CancelConsumableSelection();
+                }
             }
         }
 
@@ -114,6 +148,37 @@ namespace Riftbourne.Characters
 
             GridCell targetCell = gridManager.GetCell(targetX, targetY);
             Unit targetUnit = targetCell.OccupyingUnit;
+            
+            // CASE 0.5: If consumable selected, use it
+            if (selectedConsumable != null)
+            {
+                if (selectedConsumable.TargetType == ConsumableTargetType.GroundAOE)
+                {
+                    // Use on ground
+                    if (ConsumableExecutor.ExecuteConsumableGround(selectedConsumable, unit, targetX, targetY))
+                    {
+                        selectedConsumable = null;
+                        isSelectingConsumable = false;
+                    }
+                }
+                else
+                {
+                    // Use on unit
+                    if (targetUnit != null)
+                    {
+                        if (ConsumableExecutor.ExecuteConsumable(selectedConsumable, unit, targetUnit))
+                        {
+                            selectedConsumable = null;
+                            isSelectingConsumable = false;
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogWarning("No unit at target location for consumable!");
+                    }
+                }
+                return;
+            }
 
             // CASE 0: Clicked on a player unit - select it for control
             if (targetUnit != null && targetUnit.IsPlayerControlled && targetUnit != unit)
@@ -353,6 +418,76 @@ namespace Riftbourne.Characters
 
             // Attack failed
             Debug.Log($"Cannot attack {targetUnit.UnitName}!");
+        }
+        
+        /// <summary>
+        /// Show the consumable selection menu.
+        /// </summary>
+        private void ShowConsumableMenu()
+        {
+            var consumables = GetUsableConsumables();
+            
+            if (consumables.Count == 0)
+            {
+                Debug.Log("No usable consumables!");
+                return;
+            }
+            
+            Debug.Log("=== Consumables ===");
+            for (int i = 0; i < consumables.Count && i < 9; i++)
+            {
+                var consumable = consumables[i];
+                string targetType = consumable.TargetType == ConsumableTargetType.GroundAOE ? "[GROUND]" : "[UNIT]";
+                Debug.Log($"{i + 1}. {consumable.ItemName} {targetType} (Range: {consumable.Range})");
+            }
+            
+            isSelectingConsumable = true;
+        }
+        
+        /// <summary>
+        /// Get all consumables that can be used in the current context.
+        /// </summary>
+        private List<ConsumableItem> GetUsableConsumables()
+        {
+            var consumables = new List<ConsumableItem>();
+            bool inCombat = TurnManager.Instance != null && TurnManager.Instance.IsInCombat;
+            
+            foreach (var slot in unit.Inventory)
+            {
+                if (slot != null && slot.Item is ConsumableItem consumable && consumable.CanUseInCurrentContext(inCombat))
+                {
+                    consumables.Add(consumable);
+                }
+            }
+            
+            return consumables;
+        }
+        
+        /// <summary>
+        /// Select a consumable by index.
+        /// </summary>
+        private void SelectConsumable(int index)
+        {
+            var consumables = GetUsableConsumables();
+            
+            if (index >= 0 && index < consumables.Count)
+            {
+                selectedConsumable = consumables[index];
+                isSelectingConsumable = false;
+                
+                string targetType = selectedConsumable.TargetType == ConsumableTargetType.GroundAOE ? "ground" : "unit";
+                Debug.Log($"Selected {selectedConsumable.ItemName}. Click {targetType} to use.");
+            }
+        }
+        
+        /// <summary>
+        /// Cancel consumable selection.
+        /// </summary>
+        private void CancelConsumableSelection()
+        {
+            isSelectingConsumable = false;
+            selectedConsumable = null;
+            Debug.Log("Consumable selection cancelled.");
         }
 
     }

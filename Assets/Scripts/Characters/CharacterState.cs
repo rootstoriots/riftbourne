@@ -2,6 +2,8 @@ using UnityEngine;
 using Riftbourne.Skills;
 using Riftbourne.Combat;
 using Riftbourne.Core;
+using Riftbourne.Items;
+using Riftbourne.Inventory;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -59,6 +61,12 @@ namespace Riftbourne.Characters
 
         // Weapon Proficiencies
         [SerializeField] private SerializableDictionary<WeaponFamily, WeaponProficiency> weaponProficiencies = new SerializableDictionary<WeaponFamily, WeaponProficiency>();
+
+        // Inventory System
+        [SerializeField] private List<InventorySlot> inventory = new List<InventorySlot>();
+        [SerializeField] private List<InventorySlot> containerInventory = new List<InventorySlot>();
+        [SerializeField] private ContainerItem[] containerSlots = new ContainerItem[2];
+        [SerializeField] private int aurumShards = 0;
 
         // Cache for stat calculations
         private bool statsDirty = true;
@@ -119,6 +127,12 @@ namespace Riftbourne.Characters
         // Weapon Proficiencies
         public SerializableDictionary<WeaponFamily, WeaponProficiency> WeaponProficiencies => weaponProficiencies;
 
+        // Inventory
+        public List<InventorySlot> Inventory => inventory;
+        public List<InventorySlot> ContainerInventory => containerInventory;
+        public ContainerItem[] ContainerSlots => containerSlots;
+        public int AurumShards => aurumShards;
+
         // Constructor
         public CharacterState(CharacterDefinition definition)
         {
@@ -173,6 +187,24 @@ namespace Riftbourne.Characters
                     EquipItem(equipment, equipment.PrimarySlot);
                 }
             }
+
+            // Initialize inventory from definition
+            if (definition.StartingInventory != null)
+            {
+                foreach (var slot in definition.StartingInventory)
+                {
+                    if (slot != null && slot.Item != null && !slot.IsEmpty())
+                    {
+                        inventory.Add(new InventorySlot(slot.Item, slot.Quantity));
+                    }
+                }
+            }
+
+            // Initialize currency
+            aurumShards = definition.StartingAurumShards;
+
+            // Initialize container slots array
+            containerSlots = new ContainerItem[2];
 
             CalculateStats();
         }
@@ -662,6 +694,194 @@ namespace Riftbourne.Characters
 
             return available;
         }
+
+        #region Inventory Management
+
+        /// <summary>
+        /// Add an item to the inventory.
+        /// Returns true if item was added successfully.
+        /// </summary>
+        public bool AddItem(Item item, int quantity = 1)
+        {
+            if (item == null || quantity <= 0)
+                return false;
+
+            int remaining = quantity;
+
+            // Try to stack with existing slots first
+            foreach (var slot in inventory)
+            {
+                if (slot != null && slot.CanStack(item))
+                {
+                    remaining = slot.AddToStack(remaining);
+                    if (remaining <= 0)
+                        return true;
+                }
+            }
+
+            // Create new slots for remaining quantity
+            while (remaining > 0)
+            {
+                int stackSize = Mathf.Min(remaining, item.MaxStackSize);
+                inventory.Add(new InventorySlot(item, stackSize));
+                remaining -= stackSize;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Remove an item from the inventory.
+        /// Returns true if at least some quantity was removed.
+        /// </summary>
+        public bool RemoveItem(Item item, int quantity = 1)
+        {
+            if (item == null || quantity <= 0)
+                return false;
+
+            int remaining = quantity;
+
+            // Remove from slots
+            for (int i = inventory.Count - 1; i >= 0; i--)
+            {
+                var slot = inventory[i];
+                if (slot != null && slot.Item == item)
+                {
+                    int removed = slot.RemoveFromStack(remaining);
+                    remaining -= removed;
+
+                    if (slot.IsEmpty())
+                        inventory.RemoveAt(i);
+
+                    if (remaining <= 0)
+                        return true;
+                }
+            }
+
+            return remaining < quantity; // Returns true if at least some was removed
+        }
+
+        /// <summary>
+        /// Get the total count of a specific item in inventory.
+        /// </summary>
+        public int GetItemCount(Item item)
+        {
+            int count = 0;
+
+            foreach (var slot in inventory)
+            {
+                if (slot != null && slot.Item == item)
+                    count += slot.Quantity;
+            }
+
+            return count;
+        }
+
+        /// <summary>
+        /// Check if character has a specific item in the required quantity.
+        /// </summary>
+        public bool HasItem(Item item, int quantity = 1)
+        {
+            return GetItemCount(item) >= quantity;
+        }
+
+        /// <summary>
+        /// Gain Aurum Shards.
+        /// </summary>
+        public void GainAurumShards(int amount)
+        {
+            if (amount <= 0)
+                return;
+
+            aurumShards += amount;
+            Debug.Log($"CharacterState: Gained {amount} Aurum Shards. Total: {aurumShards}");
+        }
+
+        /// <summary>
+        /// Spend Aurum Shards.
+        /// Returns true if successful, false if insufficient balance.
+        /// </summary>
+        public bool SpendAurumShards(int amount)
+        {
+            if (amount <= 0 || aurumShards < amount)
+                return false;
+
+            aurumShards -= amount;
+            Debug.Log($"CharacterState: Spent {amount} Aurum Shards. Remaining: {aurumShards}");
+            return true;
+        }
+
+        /// <summary>
+        /// Clear all inventory (for syncing from Unit).
+        /// </summary>
+        public void ClearInventory()
+        {
+            inventory.Clear();
+        }
+
+        /// <summary>
+        /// Clear container inventory (for syncing from Unit).
+        /// </summary>
+        public void ClearContainerInventory()
+        {
+            containerInventory.Clear();
+        }
+
+        /// <summary>
+        /// Set container slots (for syncing from Unit).
+        /// </summary>
+        public void SetContainerSlots(ContainerItem[] slots)
+        {
+            if (slots == null)
+            {
+                containerSlots = new ContainerItem[2];
+            }
+            else
+            {
+                containerSlots = new ContainerItem[slots.Length];
+                System.Array.Copy(slots, containerSlots, slots.Length);
+            }
+        }
+
+        /// <summary>
+        /// Set Aurum Shards directly (for syncing from Unit).
+        /// </summary>
+        public void SetAurumShards(int amount)
+        {
+            aurumShards = Mathf.Max(0, amount);
+        }
+
+        /// <summary>
+        /// Add item to container inventory (for syncing from Unit).
+        /// </summary>
+        public void AddToContainerInventory(Item item, int quantity)
+        {
+            if (item == null || quantity <= 0)
+                return;
+
+            int remaining = quantity;
+
+            // Try to stack with existing slots first
+            foreach (var slot in containerInventory)
+            {
+                if (slot != null && slot.CanStack(item))
+                {
+                    remaining = slot.AddToStack(remaining);
+                    if (remaining <= 0)
+                        return;
+                }
+            }
+
+            // Create new slots for remaining quantity
+            while (remaining > 0)
+            {
+                int stackSize = Mathf.Min(remaining, item.MaxStackSize);
+                containerInventory.Add(new InventorySlot(item, stackSize));
+                remaining -= stackSize;
+            }
+        }
+
+        #endregion
 
         /// <summary>
         /// Restore runtime references after deserialization.

@@ -10,6 +10,9 @@ namespace Riftbourne.Combat
 {
     public class TurnManager : MonoBehaviour
     {
+        private static TurnManager instance;
+        public static TurnManager Instance => instance;
+        
         [Header("Turn Management")]
         [SerializeField] private List<Unit> allUnits = new List<Unit>();
         [SerializeField] private int currentTurnIndex = 0;
@@ -36,6 +39,7 @@ namespace Riftbourne.Combat
         // Public properties
         public Unit CurrentUnit { get; private set; }
         public bool IsPlayerTurn => CurrentUnit != null && CurrentUnit.IsPlayerControlled;
+        public bool IsInCombat => combatInitialized && !IsCombatOver();
 
         /// <summary>
         /// Returns a copy of all units in combat for UI display.
@@ -83,12 +87,29 @@ namespace Riftbourne.Combat
         // Round tracking for hazard updates
         private int lastHazardUpdateRound = 0;
         private int currentRound = 1;
+        
+        // Encounter data for win condition checking
+        private EncounterData currentEncounter;
 
         // Coroutine tracking to prevent multiple enemy window coroutines
         private Coroutine currentEnemyWindowCoroutine;
 
+        [Header("Initialization Settings")]
+        [Tooltip("If true, automatically initializes combat on Start (for backward compatibility)")]
+        [SerializeField] private bool autoInitializeOnStart = false;
+
         private void Awake()
         {
+            if (instance == null)
+            {
+                instance = this;
+            }
+            else if (instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+            
             ManagerRegistry.Register(this);
         }
 
@@ -102,6 +123,11 @@ namespace Riftbourne.Combat
             {
                 StopCoroutine(currentEnemyWindowCoroutine);
                 currentEnemyWindowCoroutine = null;
+            }
+            
+            if (instance == this)
+            {
+                instance = null;
             }
             
             ManagerRegistry.Unregister(this);
@@ -125,10 +151,14 @@ namespace Riftbourne.Combat
             // Ensure all factions are registered before initializing combat
             RegisterAllFactionsFromUnits();
             
-            // Delay combat initialization to ensure all units are fully created and initialized
-            // This is especially important when units are created dynamically (e.g., from CharacterState)
-            // Wait one frame to allow BattleSceneInitializer and unit Start() methods to complete
-            StartCoroutine(DelayedCombatInitialization());
+            // Only auto-initialize if flag is set (for backward compatibility)
+            if (autoInitializeOnStart)
+            {
+                // Delay combat initialization to ensure all units are fully created and initialized
+                // This is especially important when units are created dynamically (e.g., from CharacterState)
+                // Wait one frame to allow BattleSceneInitializer and unit Start() methods to complete
+                StartCoroutine(DelayedCombatInitialization());
+            }
         }
         
         /// <summary>
@@ -168,10 +198,26 @@ namespace Riftbourne.Combat
         {
             if (unit == null) return;
             
-            // If an enemy died, check if combat is over
+            // If an enemy died, process loot and check if combat is over
             if (unit.Faction != Faction.Player)
             {
                 Debug.Log($"TurnManager: Enemy {unit.UnitName} died. Checking if combat is over...");
+                
+                // Process loot from enemy using EnemyLoot component
+                if (LootManager.Instance != null)
+                {
+                    EnemyLoot enemyLoot = unit.GetComponent<EnemyLoot>();
+                    if (enemyLoot != null)
+                    {
+                        LootData lootData = enemyLoot.GenerateLoot();
+                        LootManager.Instance.AddLoot(lootData);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"TurnManager: Enemy {unit.UnitName} died but has no EnemyLoot component. No loot will be dropped.");
+                    }
+                }
+                
                 // Small delay to ensure unit is properly removed from lists
                 StartCoroutine(CheckCombatOverAfterDeath());
             }
@@ -364,9 +410,24 @@ namespace Riftbourne.Combat
         {
             if (unit == null) return;
 
-            if (allUnits.Remove(unit))
+            int unitIndex = allUnits.IndexOf(unit);
+            if (unitIndex >= 0)
             {
-                Debug.Log($"TurnManager: Unregistered {unit.UnitName}");
+                allUnits.RemoveAt(unitIndex);
+                Debug.Log($"TurnManager: Unregistered {unit.UnitName} (was at index {unitIndex}, currentTurnIndex: {currentTurnIndex})");
+                
+                // Adjust currentTurnIndex if the removed unit was before or at the current index
+                if (unitIndex <= currentTurnIndex)
+                {
+                    // If we removed the unit at currentTurnIndex, the next unit is now at that position
+                    // So we don't need to increment - currentTurnIndex already points to the next unit
+                    // But if we removed a unit before currentTurnIndex, we need to decrement
+                    if (unitIndex < currentTurnIndex)
+                    {
+                        currentTurnIndex--;
+                    }
+                    // If unitIndex == currentTurnIndex, currentTurnIndex now points to the next unit (correct)
+                }
                 
                 // Remove from current window if present
                 currentTurnWindow.Remove(unit);
@@ -388,6 +449,52 @@ namespace Riftbourne.Combat
         }
 
         private bool combatInitialized = false;
+
+        /// <summary>
+        /// Initialize combat with a specific list of units.
+        /// Clears existing state and sets up combat with the provided units.
+        /// </summary>
+        public void InitializeCombat(List<Unit> allUnits)
+        {
+            InitializeCombat(allUnits, null);
+        }
+        
+        /// <summary>
+        /// Initialize combat with a specific list of units and encounter data.
+        /// Clears existing state and sets up combat with the provided units.
+        /// </summary>
+        public void InitializeCombat(List<Unit> allUnits, EncounterData encounter)
+        {
+            if (allUnits == null)
+            {
+                Debug.LogError("TurnManager.InitializeCombat: allUnits list is null!");
+                return;
+            }
+
+            currentEncounter = encounter;
+
+            // Clear existing state
+            this.allUnits.Clear();
+            currentTurnWindow.Clear();
+            currentTurnIndex = 0;
+            currentRound = 1;
+            CurrentUnit = null;
+            combatInitialized = false;
+
+            // Set new unit list
+            this.allUnits = new List<Unit>(allUnits);
+
+            Debug.Log($"TurnManager.InitializeCombat: Initializing with {this.allUnits.Count} units");
+
+            // Ensure all factions are registered
+            RegisterAllFactionsFromUnits();
+
+            // Sort units by speed (using existing logic)
+            ReSortUnitsBySpeed();
+
+            // Finalize initialization
+            FinalizeCombatInitialization();
+        }
 
         /// <summary>
         /// Register a unit that was created after TurnManager initialization.
@@ -686,9 +793,22 @@ namespace Riftbourne.Combat
             }
             
             // Ensure we don't go out of bounds
+            if (allUnits.Count == 0)
+            {
+                Debug.LogWarning("TurnManager: No units remaining! Combat should have ended.");
+                return;
+            }
+            
             if (currentTurnIndex >= allUnits.Count)
             {
-                Debug.LogWarning("TurnManager: currentTurnIndex is out of bounds after wrap check!");
+                Debug.LogWarning($"TurnManager: currentTurnIndex ({currentTurnIndex}) is out of bounds (allUnits.Count: {allUnits.Count})! Resetting to 0.");
+                currentTurnIndex = 0;
+            }
+            
+            // Ensure currentTurnIndex is valid
+            if (currentTurnIndex < 0)
+            {
+                Debug.LogWarning($"TurnManager: currentTurnIndex ({currentTurnIndex}) is negative! Resetting to 0.");
                 currentTurnIndex = 0;
             }
 
@@ -930,7 +1050,7 @@ namespace Riftbourne.Combat
         }
 
         /// <summary>
-        /// Check if combat is over (player faction eliminated, or all hostile factions eliminated).
+        /// Check if combat is over based on win conditions.
         /// Uses FactionRelationship to properly determine hostile factions.
         /// </summary>
         public bool IsCombatOver()
@@ -940,24 +1060,93 @@ namespace Riftbourne.Combat
                 return true; // No units = combat over
             }
 
+            // Get victory condition from encounter data
+            VictoryCondition victoryCondition = VictoryCondition.KillAll; // Default
+            int turnLimit = 0;
+            if (currentEncounter != null)
+            {
+                victoryCondition = currentEncounter.VictoryCondition;
+                turnLimit = currentEncounter.TurnLimit;
+            }
+
+            // Check win condition based on type
+            switch (victoryCondition)
+            {
+                case VictoryCondition.KillAll:
+                    return CheckKillAllCondition();
+                    
+                case VictoryCondition.SurviveXRounds:
+                    return CheckSurviveRoundsCondition(turnLimit);
+                    
+                case VictoryCondition.ProtectTarget:
+                    return CheckProtectTargetCondition();
+                    
+                case VictoryCondition.ReachLocation:
+                    return CheckReachLocationCondition();
+                    
+                case VictoryCondition.Custom:
+                    // Custom conditions not yet implemented
+                    return CheckKillAllCondition(); // Fallback to KillAll
+                    
+                default:
+                    return CheckKillAllCondition(); // Default fallback
+            }
+        }
+        
+        /// <summary>
+        /// Check KillAll win condition (default).
+        /// </summary>
+        private bool CheckKillAllCondition()
+        {
             FactionRelationship factionRel = FactionRelationship.Instance ?? FindFirstObjectByType<FactionRelationship>();
             if (factionRel == null)
             {
-                Debug.LogWarning("TurnManager: FactionRelationship not found! Cannot properly determine combat end.");
+                // FactionRelationship not found - use simple faction check as fallback
+                bool hasNonPlayerUnits = false;
+                bool hasPlayerUnits = false;
+                
+                foreach (Unit unit in allUnits)
+                {
+                    if (unit == null || !unit.IsAlive) continue;
+                    
+                    if (unit.Faction == Faction.Player || (unit.FactionData != null && unit.FactionData.IsPlayerFaction))
+                    {
+                        hasPlayerUnits = true;
+                    }
+                    else
+                    {
+                        hasNonPlayerUnits = true;
+                    }
+                }
+                
+                // Combat is over if player faction is eliminated
+                if (!hasPlayerUnits)
+                {
+                    Debug.Log("Combat Over: Player faction defeated! (FactionRelationship not available, using simple check)");
+                    GameEvents.RaiseCombatEnded(false);
+                    return true;
+                }
+                
+                // Combat is over if no non-player units remain
+                if (!hasNonPlayerUnits)
+                {
+                    Debug.Log("Combat Over: All non-player units eliminated! Player faction victorious! (FactionRelationship not available, using simple check)");
+                    GameEvents.RaiseCombatEnded(true);
+                    return true;
+                }
+                
                 return false;
             }
 
             // Count alive units and check factions
             bool playerFactionAlive = false;
             HashSet<Faction> hostileFactions = new HashSet<Faction>();
-            HashSet<Faction> allAliveFactions = new HashSet<Faction>();
 
             foreach (Unit unit in allUnits)
             {
                 if (unit == null || !unit.IsAlive) continue;
 
                 Faction unitFaction = unit.Faction;
-                allAliveFactions.Add(unitFaction);
 
                 // Check if this is player faction
                 if (unitFaction == Faction.Player || (unit.FactionData != null && unit.FactionData.IsPlayerFaction))
@@ -991,6 +1180,65 @@ namespace Riftbourne.Combat
             }
 
             return false;
+        }
+        
+        /// <summary>
+        /// Check SurviveXRounds win condition.
+        /// </summary>
+        private bool CheckSurviveRoundsCondition(int roundsToSurvive)
+        {
+            // Check if player faction is eliminated (defeat condition)
+            bool playerFactionAlive = false;
+            foreach (Unit unit in allUnits)
+            {
+                if (unit == null || !unit.IsAlive) continue;
+                if (unit.Faction == Faction.Player || (unit.FactionData != null && unit.FactionData.IsPlayerFaction))
+                {
+                    playerFactionAlive = true;
+                    break;
+                }
+            }
+            
+            if (!playerFactionAlive)
+            {
+                Debug.Log("Combat Over: Player faction defeated!");
+                GameEvents.RaiseCombatEnded(false);
+                return true;
+            }
+            
+            // Check if survived required rounds
+            if (roundsToSurvive > 0 && currentRound > roundsToSurvive)
+            {
+                Debug.Log($"Combat Over: Survived {roundsToSurvive} rounds! Player faction victorious!");
+                GameEvents.RaiseCombatEnded(true);
+                return true;
+            }
+            
+            return false;
+        }
+        
+        /// <summary>
+        /// Check ProtectTarget win condition.
+        /// TODO: Requires target unit reference in EncounterData.
+        /// </summary>
+        private bool CheckProtectTargetCondition()
+        {
+            // For now, fallback to KillAll
+            // TODO: Implement when EncounterData has target unit reference
+            Debug.LogWarning("ProtectTarget win condition not yet fully implemented - using KillAll fallback");
+            return CheckKillAllCondition();
+        }
+        
+        /// <summary>
+        /// Check ReachLocation win condition.
+        /// TODO: Requires target position in EncounterData.
+        /// </summary>
+        private bool CheckReachLocationCondition()
+        {
+            // For now, fallback to KillAll
+            // TODO: Implement when EncounterData has target position reference
+            Debug.LogWarning("ReachLocation win condition not yet fully implemented - using KillAll fallback");
+            return CheckKillAllCondition();
         }
     }
 }
