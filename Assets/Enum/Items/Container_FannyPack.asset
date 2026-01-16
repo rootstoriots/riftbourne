@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Items.ContainerItem
   itemName: Fanny Pack
   description: 
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 53f0a099e5669d345a3f0b7f41c2f8c7, type: 3}
   rarity: 0
   weight: 0.05
   baseValue: 200

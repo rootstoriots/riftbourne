@@ -14,12 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Characters.EquipmentItem
   itemName: Scholar's Codex
   description: 
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: cb93653465f6bc64f938a8231850ae83, type: 3}
   rarity: 0
   weight: 0.2
   baseValue: 100
   maxStackSize: 1
-  compatibleSlots: 
+  compatibleSlots: 05000000
   meleeWeaponType: 0
   rangedWeaponType: 0
   armorType: 0

@@ -17,6 +17,7 @@ MonoBehaviour:
   fullName: Nalya dels Avirne el Ruus
   title: Lady-Captain of Halen
   portrait: {fileID: 21300000, guid: 0f99f389a36044b4d8e7b0917fd031f5, type: 3}
+  inventoryTabPortrait: {fileID: 21300000, guid: 2be9bcacc9be8d34896b290532d515f6, type: 3}
   bio: A young noblewoman hailing from the Kingdom of Halen.
   baseStrength: 5
   baseFinesse: 5
@@ -34,6 +35,10 @@ MonoBehaviour:
   - item: {fileID: 11400000, guid: dfc080644dc8de24198ed539911b40a0, type: 2}
     quantity: 1
   - item: {fileID: 11400000, guid: d0c020c7af4e6fc48a389e192aa174e1, type: 2}
+    quantity: 2
+  - item: {fileID: 11400000, guid: e073d9ecdf198e14996df1fe0ec4ac2d, type: 2}
+    quantity: 2
+  - item: {fileID: 11400000, guid: 1c7db01c948c99640b0c3661ce4d801b, type: 2}
     quantity: 2
   startingAurumShards: 100
   isPOVCharacter: 1

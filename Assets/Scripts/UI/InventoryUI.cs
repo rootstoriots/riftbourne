@@ -10,14 +10,17 @@ using Riftbourne.Inventory;
 namespace Riftbourne.UI
 {
     /// <summary>
-    /// Basic inventory UI for displaying unit inventory, weight, and currency.
+    /// Inventory UI for displaying unit inventory, weight, and currency.
+    /// Now uses grid-based visual display with drag-and-drop.
     /// Integrated into StatusMenuUI's inventory tab.
     /// </summary>
     public class InventoryUI : MonoBehaviour
     {
         [Header("UI References")]
-        [SerializeField] private TextMeshProUGUI inventoryText;
         [SerializeField] private TextMeshProUGUI statsText;
+        [SerializeField] private ItemGridUI itemGrid;
+        [SerializeField] private EquipmentSlotsPanel equipmentPanel;
+        [SerializeField] private ItemDetailsPanel detailsPanel;
         
         private Unit currentUnit;
         private CharacterState currentCharacterState;
@@ -199,51 +202,21 @@ namespace Riftbourne.UI
                                weightInfo;
             }
             
-            // Inventory display - use CharacterState's inventory directly
-            if (inventoryText != null)
+            // Inventory display - use grid system
+            if (itemGrid != null)
             {
-                string inventoryDisplay = "=== Main Inventory ===\n";
-                
-                if (state.Inventory != null && state.Inventory.Count > 0)
+                itemGrid.PopulateGrid(state, matchingUnit);
+            }
+
+            // Equipment display
+            if (equipmentPanel != null)
+            {
+                equipmentPanel.Initialize(state);
+                // Pass itemGrid reference for drag-and-drop
+                if (itemGrid != null)
                 {
-                    foreach (var slot in state.Inventory)
-                    {
-                        if (slot != null && slot.Item != null)
-                        {
-                            string rarity = GetRarityColorTag(slot.Item.Rarity);
-                            inventoryDisplay += $"{rarity}{slot.Item.ItemName}</color> x{slot.Quantity} " +
-                                              $"({slot.GetTotalWeight():F2} kg)\n";
-                        }
-                    }
+                    equipmentPanel.SetItemGrid(itemGrid);
                 }
-                else
-                {
-                    inventoryDisplay += "<color=grey>No items</color>\n";
-                }
-                
-                inventoryDisplay += "\n=== Containers ===\n";
-                if (state.ContainerSlots != null)
-                {
-                    for (int i = 0; i < state.ContainerSlots.Length; i++)
-                    {
-                        var container = state.ContainerSlots[i];
-                        inventoryDisplay += $"Slot {i + 1}: {(container != null ? container.ItemName : "Empty")}\n";
-                    }
-                }
-                
-                if (state.ContainerInventory != null && state.ContainerInventory.Count > 0)
-                {
-                    inventoryDisplay += "\n=== Container Inventory ===\n";
-                    foreach (var slot in state.ContainerInventory)
-                    {
-                        if (slot != null && slot.Item != null)
-                        {
-                            inventoryDisplay += $"{slot.Item.ItemName} x{slot.Quantity}\n";
-                        }
-                    }
-                }
-                
-                inventoryText.text = inventoryDisplay;
             }
         }
         
@@ -268,51 +241,32 @@ namespace Riftbourne.UI
                                (unit.IsOverencumbered ? "<color=red>OVERENCUMBERED!</color>" : "");
             }
             
-            // Inventory display
-            if (inventoryText != null)
+            // Inventory display - use grid system
+            // Convert Unit to CharacterState for grid display
+            CharacterState unitState = FindCharacterStateForUnit(unit);
+            if (itemGrid != null)
             {
-                string inventoryDisplay = "=== Main Inventory ===\n";
-                
-                if (unit.Inventory != null && unit.Inventory.Count > 0)
+                if (unitState != null)
                 {
-                    foreach (var slot in unit.Inventory)
-                    {
-                        if (slot != null && slot.Item != null)
-                        {
-                            string rarity = GetRarityColorTag(slot.Item.Rarity);
-                            inventoryDisplay += $"{rarity}{slot.Item.ItemName}</color> x{slot.Quantity} " +
-                                              $"({slot.GetTotalWeight():F2} kg)\n";
-                        }
-                    }
+                    itemGrid.PopulateGrid(unitState, unit);
                 }
                 else
                 {
-                    inventoryDisplay += "<color=grey>No items</color>\n";
+                    // Fallback: create temporary CharacterState from Unit
+                    // This is not ideal but maintains backward compatibility
+                    Debug.LogWarning("InventoryUI: Could not find CharacterState for Unit. Grid display may not work correctly.");
                 }
-                
-                inventoryDisplay += "\n=== Containers ===\n";
-                if (unit.ContainerSlots != null)
+            }
+
+            // Equipment display
+            if (equipmentPanel != null && unitState != null)
+            {
+                equipmentPanel.Initialize(unitState);
+                // Pass itemGrid reference for drag-and-drop
+                if (itemGrid != null)
                 {
-                    for (int i = 0; i < unit.ContainerSlots.Length; i++)
-                    {
-                        var container = unit.ContainerSlots[i];
-                        inventoryDisplay += $"Slot {i + 1}: {(container != null ? container.ItemName : "Empty")}\n";
-                    }
+                    equipmentPanel.SetItemGrid(itemGrid);
                 }
-                
-                if (unit.ContainerInventory != null && unit.ContainerInventory.Count > 0)
-                {
-                    inventoryDisplay += "\n=== Container Inventory ===\n";
-                    foreach (var slot in unit.ContainerInventory)
-                    {
-                        if (slot != null && slot.Item != null)
-                        {
-                            inventoryDisplay += $"{slot.Item.ItemName} x{slot.Quantity}\n";
-                        }
-                    }
-                }
-                
-                inventoryText.text = inventoryDisplay;
             }
         }
         
@@ -358,26 +312,21 @@ namespace Riftbourne.UI
                 statsText.text = "<color=grey>No character selected</color>";
             }
             
-            if (inventoryText != null)
+            if (itemGrid != null)
             {
-                inventoryText.text = "<color=grey>No inventory to display</color>";
+                itemGrid.PopulateGrid(null, null);
             }
-        }
-        
-        /// <summary>
-        /// Get the color tag for an item rarity.
-        /// </summary>
-        private string GetRarityColorTag(ItemRarity rarity)
-        {
-            return rarity switch
+
+            if (equipmentPanel != null)
             {
-                ItemRarity.Common => "<color=white>",
-                ItemRarity.Uncommon => "<color=green>",
-                ItemRarity.Rare => "<color=blue>",
-                ItemRarity.Epic => "<color=purple>",
-                ItemRarity.Legendary => "<color=orange>",
-                _ => "<color=white>"
-            };
+                equipmentPanel.Initialize(null);
+            }
+
+            // Show empty state in details panel
+            if (detailsPanel != null)
+            {
+                detailsPanel.ShowEmptyState();
+            }
         }
     }
 }

@@ -314,7 +314,8 @@ namespace Riftbourne.UI
             if (statusTabButton != null)
                 statusTabButton.onClick.AddListener(() => SwitchTab(TabType.Status));
             if (equipmentTabButton != null)
-                equipmentTabButton.onClick.AddListener(() => SwitchTab(TabType.Equipment));
+                // Equipment tab now redirects to Inventory (combined)
+                equipmentTabButton.onClick.AddListener(() => SwitchTab(TabType.Inventory));
             if (skillsTabButton != null)
                 skillsTabButton.onClick.AddListener(() => SwitchTab(TabType.Skills));
             if (inventoryTabButton != null)
@@ -560,8 +561,10 @@ namespace Riftbourne.UI
                     RefreshStatusTab();
                     break;
                 case TabType.Equipment:
-                    if (equipmentTabPanel != null) equipmentTabPanel.SetActive(true);
-                    // TODO: Implement equipment tab
+                    // Equipment is now combined with Inventory tab
+                    // Redirect to Inventory tab
+                    if (inventoryTabPanel != null) inventoryTabPanel.SetActive(true);
+                    RefreshInventoryTab();
                     break;
                 case TabType.Skills:
                     if (skillsTabPanel != null) skillsTabPanel.SetActive(true);

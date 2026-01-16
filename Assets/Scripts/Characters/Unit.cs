@@ -1904,6 +1904,9 @@ namespace Riftbourne.Characters
                 return;
             }
 
+            // Set the characterState reference for this Unit
+            characterState = state;
+
             // Update CharacterState from Unit
             state.UpdateFromUnit(this);
 

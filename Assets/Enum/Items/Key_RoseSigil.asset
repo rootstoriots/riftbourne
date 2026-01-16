@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Items.KeyItem
   itemName: Rose Sigil
   description: The sigil of the House of Roses
-  icon: {fileID: 21300000, guid: 5c8bc766719296e44834e410eb33e65d, type: 3}
+  icon: {fileID: 21300000, guid: 5c4776b41296bde47b4e2daec3625848, type: 3}
   rarity: 4
   weight: 0
   baseValue: 0

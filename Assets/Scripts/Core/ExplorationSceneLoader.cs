@@ -85,10 +85,17 @@ namespace Riftbourne.Core
 
                 if (matchingState != null)
                 {
-                    // Update CharacterState from Unit
+                    // Ensure Unit has CharacterState reference for any methods that need it
+                    if (unit.CharacterState == null)
+                    {
+                        // Set the reference if not already set
+                        unit.ExportToCharacterState(matchingState);
+                    }
+                    
+                    // Update CharacterState from Unit (this now includes inventory sync)
                     matchingState.UpdateFromUnit(unit);
                     
-                    // Sync inventory from Unit to CharacterState
+                    // Also sync inventory explicitly (backup method)
                     unit.SyncInventoryToCharacterState();
                     
                     Debug.Log($"ExplorationSceneLoader: Updated {matchingState.CharacterID} from battle Unit {unit.UnitName}");

@@ -22,6 +22,8 @@ namespace Riftbourne.Characters
         [Tooltip("Character's title or epithet (e.g., 'The Riftwalker', 'Master Scholar')")]
         [SerializeField] private string title = "";
         [SerializeField] private Sprite portrait;
+        [Tooltip("Full body image displayed behind equipment slots in inventory tab. Should preserve aspect ratio with fixed height.")]
+        [SerializeField] private Sprite inventoryTabPortrait;
         [TextArea(3, 5)]
         [SerializeField] private string bio = "Character description";
 
@@ -74,6 +76,7 @@ namespace Riftbourne.Characters
         public string FullName => string.IsNullOrEmpty(fullName) ? characterName : fullName;
         public string Title => title;
         public Sprite Portrait => portrait;
+        public Sprite InventoryTabPortrait => inventoryTabPortrait;
         public string Bio => bio;
 
         // Base stats

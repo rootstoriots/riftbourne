@@ -662,11 +662,46 @@ namespace Riftbourne.Characters
                 }
             }
 
+            // Sync inventory from Unit
+            ClearInventory();
+            if (unit.Inventory != null)
+            {
+                foreach (var slot in unit.Inventory)
+                {
+                    if (slot != null && slot.Item != null && !slot.IsEmpty())
+                    {
+                        AddItem(slot.Item, slot.Quantity);
+                    }
+                }
+            }
+
+            // Sync container inventory
+            ClearContainerInventory();
+            if (unit.ContainerInventory != null)
+            {
+                foreach (var slot in unit.ContainerInventory)
+                {
+                    if (slot != null && slot.Item != null && !slot.IsEmpty())
+                    {
+                        AddToContainerInventory(slot.Item, slot.Quantity);
+                    }
+                }
+            }
+
+            // Sync container slots
+            if (unit.ContainerSlots != null)
+            {
+                SetContainerSlots(unit.ContainerSlots);
+            }
+
+            // Sync currency
+            SetAurumShards(unit.AurumShards);
+
             // Recalculate stats
             statsDirty = true;
             CalculateStats();
 
-            Debug.Log($"CharacterState: Updated from Unit {unit.UnitName}");
+            Debug.Log($"CharacterState: Updated from Unit {unit.UnitName} (including inventory)");
         }
 
         /// <summary>

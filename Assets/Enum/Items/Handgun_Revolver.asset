@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Characters.EquipmentItem
   itemName: Revolver
   description: 
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 038748d7fa5f98641800c4153a26fe0a, type: 3}
   rarity: 0
   weight: 0.8
   baseValue: 150
@@ -34,5 +34,5 @@ MonoBehaviour:
   speedBonus: 0
   luckBonus: 0
   maxHPBonusPercent: 0
-  currentDurability: 100
+  currentDurability: 98
   maxDurability: 100

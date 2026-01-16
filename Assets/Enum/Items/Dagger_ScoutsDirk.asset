@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Characters.EquipmentItem
   itemName: Scout's Dirk
   description: 
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: ebcfbee20cfa2a74089978e6b0f11b82, type: 3}
   rarity: 0
   weight: 0.3
   baseValue: 100

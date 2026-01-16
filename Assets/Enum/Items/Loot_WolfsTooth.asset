@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.Items.LootItem
   itemName: Wolf's Tooth
   description: 
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 33ba85d5fc7cbab4a9dcd8dc35e31542, type: 3}
   rarity: 0
   weight: 0.01
   baseValue: 10
