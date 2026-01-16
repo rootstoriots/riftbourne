@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: ButtonStyle_Loot
   m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.UI.ItemButtonStyle
   itemType: 0
-  buttonSprite: {fileID: 0}
+  buttonSprite: {fileID: 21300000, guid: ac8d3261bac0f4940a6ce190cdf31002, type: 3}
   baseColor: {r: 0, g: 0.0377028, b: 1, a: 1}
   commonColor: {r: 1, g: 1, b: 1, a: 1}
   uncommonColor: {r: 0.8, g: 1, b: 0.8, a: 1}

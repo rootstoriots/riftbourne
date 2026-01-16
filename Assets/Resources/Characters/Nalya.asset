@@ -40,6 +40,16 @@ MonoBehaviour:
     quantity: 2
   - item: {fileID: 11400000, guid: 1c7db01c948c99640b0c3661ce4d801b, type: 2}
     quantity: 2
+  - item: {fileID: 11400000, guid: 1c7db01c948c99640b0c3661ce4d801b, type: 2}
+    quantity: 2
+  - item: {fileID: 11400000, guid: 1c7db01c948c99640b0c3661ce4d801b, type: 2}
+    quantity: 2
+  - item: {fileID: 11400000, guid: 1c7db01c948c99640b0c3661ce4d801b, type: 2}
+    quantity: 2
+  - item: {fileID: 11400000, guid: 1c7db01c948c99640b0c3661ce4d801b, type: 2}
+    quantity: 2
+  - item: {fileID: 11400000, guid: 1c7db01c948c99640b0c3661ce4d801b, type: 2}
+    quantity: 2
   startingAurumShards: 100
   isPOVCharacter: 1
   availableChapters:

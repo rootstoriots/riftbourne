@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using TMPro;
+using System.Collections;
 using Riftbourne.Items;
 using Riftbourne.Characters;
 
@@ -20,6 +21,7 @@ namespace Riftbourne.UI
         [SerializeField] private TextMeshProUGUI slotLabelText;
         [SerializeField] private GameObject emptyIndicator;
         [SerializeField] private CanvasGroup canvasGroup;
+        [SerializeField] private Image dropIndicatorImage;
 
         [Header("Slot Configuration")]
         [SerializeField] private EquipmentSlot equipmentSlot;
@@ -28,24 +30,174 @@ namespace Riftbourne.UI
         [SerializeField] private float dragAlpha = 0.6f;
         [SerializeField] private GameObject dragGhostPrefab;
 
+        [Header("Drop Indicator Pulse Settings")]
+        [Tooltip("Pulses per second (higher = faster)")]
+        [SerializeField] private float pulseSpeed = 2f;
+        [Tooltip("Minimum scale during pulse (0.9 = 90% size)")]
+        [SerializeField] private float minScale = 0.9f;
+        [Tooltip("Maximum scale during pulse (1.1 = 110% size)")]
+        [SerializeField] private float maxScale = 1.1f;
+        [Tooltip("Minimum alpha during pulse (0.5 = 50% transparent)")]
+        [SerializeField] private float minAlpha = 0.5f;
+        [Tooltip("Maximum alpha during pulse (1.0 = fully opaque)")]
+        [SerializeField] private float maxAlpha = 1f;
+        [Tooltip("Minimum brightness multiplier (0.7 = 70% brightness)")]
+        [SerializeField] private float minBrightness = 0.7f;
+        [Tooltip("Maximum brightness multiplier (1.2 = 120% brightness, creates glow)")]
+        [SerializeField] private float maxBrightness = 1.2f;
+
         private CharacterState currentCharacter;
         private EquipmentSlotsPanel parentPanel;
         private ItemDetailsPanel detailsPanel;
         private ItemGridUI itemGrid;
+        private InventoryUI inventoryUI;
         private bool isDragging = false;
         private GameObject dragGhost;
         private Canvas rootCanvas;
+        
+        // Pulsing animation
+        private Coroutine pulseCoroutine;
+        private bool isPulsing = false;
 
         // Events
         public System.Action<EquipmentSlotUI, EquipmentItem> OnItemEquipped;
 
         public EquipmentSlot Slot => equipmentSlot;
 
+        /// <summary>
+        /// Show pulsing drop indicator for this slot.
+        /// </summary>
+        public void ShowDropIndicator()
+        {
+            if (dropIndicatorImage == null)
+            {
+                Debug.LogWarning($"EquipmentSlotUI: Cannot show drop indicator - DropIndicatorImage is null! Slot: {equipmentSlot}");
+                return;
+            }
+            
+            if (!isPulsing)
+            {
+                dropIndicatorImage.enabled = true;
+                isPulsing = true;
+                
+                // Ensure we have a valid MonoBehaviour to run coroutine
+                if (this != null && gameObject.activeInHierarchy)
+                {
+                    pulseCoroutine = StartCoroutine(PulseAnimation());
+                    Debug.Log($"EquipmentSlotUI: Started pulse animation for {equipmentSlot}");
+                }
+                else
+                {
+                    Debug.LogWarning($"EquipmentSlotUI: Cannot start coroutine - GameObject not active! Slot: {equipmentSlot}");
+                    isPulsing = false;
+                    dropIndicatorImage.enabled = false;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Hide pulsing drop indicator for this slot.
+        /// </summary>
+        public void HideDropIndicator()
+        {
+            if (dropIndicatorImage == null) return;
+            
+            if (isPulsing)
+            {
+                isPulsing = false;
+                if (pulseCoroutine != null)
+                {
+                    StopCoroutine(pulseCoroutine);
+                    pulseCoroutine = null;
+                }
+                dropIndicatorImage.enabled = false;
+                
+                // Reset scale and alpha
+                if (dropIndicatorImage != null)
+                {
+                    dropIndicatorImage.transform.localScale = Vector3.one;
+                    Color color = dropIndicatorImage.color;
+                    color.a = 1f;
+                    dropIndicatorImage.color = color;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Pulsing animation coroutine.
+        /// Creates a smooth pulsing/glowing effect using scale and alpha animations.
+        /// All parameters are configurable in the Inspector.
+        /// </summary>
+        private IEnumerator PulseAnimation()
+        {
+            if (dropIndicatorImage == null)
+            {
+                Debug.LogWarning($"EquipmentSlotUI: DropIndicatorImage is null! Cannot pulse. Slot: {equipmentSlot}");
+                yield break;
+            }
+
+            // Store base color RGB values (preserve original color, ignore alpha)
+            Color originalColor = dropIndicatorImage.color;
+            float baseR = originalColor.r;
+            float baseG = originalColor.g;
+            float baseB = originalColor.b;
+
+            // Initialize starting values
+            float startTime = Time.unscaledTime; // Use unscaled time to work even if game is paused
+            float initialScale = Mathf.Lerp(minScale, maxScale, 0.5f); // Start at midpoint
+            dropIndicatorImage.transform.localScale = Vector3.one * initialScale;
+            
+            Debug.Log($"EquipmentSlotUI: Pulse animation started for {equipmentSlot}. Base color: R={baseR:F2}, G={baseG:F2}, B={baseB:F2}");
+
+            int frameCount = 0;
+            while (isPulsing && dropIndicatorImage != null && dropIndicatorImage.enabled)
+            {
+                // Calculate time elapsed since animation started
+                float elapsedTime = (Time.unscaledTime - startTime) * pulseSpeed;
+                
+                // Create smooth sine wave from 0 to 1
+                float pulse = (Mathf.Sin(elapsedTime * Mathf.PI * 2f) + 1f) * 0.5f;
+
+                // Scale animation (pulsing size)
+                float scale = Mathf.Lerp(minScale, maxScale, pulse);
+                dropIndicatorImage.transform.localScale = Vector3.one * scale;
+
+                // Alpha animation (fading in/out)
+                float alpha = Mathf.Lerp(minAlpha, maxAlpha, pulse);
+
+                // Brightness/glow animation (makes it "glow")
+                float brightness = Mathf.Lerp(minBrightness, maxBrightness, pulse);
+
+                // Apply all changes to color
+                Color color = new Color(
+                    Mathf.Clamp01(baseR * brightness),
+                    Mathf.Clamp01(baseG * brightness),
+                    Mathf.Clamp01(baseB * brightness),
+                    alpha
+                );
+
+                dropIndicatorImage.color = color;
+
+                // Debug output every 60 frames (~1 second at 60fps)
+                frameCount++;
+                if (frameCount % 60 == 0)
+                {
+                    Debug.Log($"EquipmentSlotUI: Pulse animating - elapsed={elapsedTime:F2}s, pulse={pulse:F2}, scale={scale:F2}, alpha={alpha:F2}, brightness={brightness:F2}");
+                }
+
+                yield return null;
+            }
+            
+            Debug.Log($"EquipmentSlotUI: Pulse animation ended for {equipmentSlot}");
+        }
+
         private void Awake()
         {
             if (slotLabelText != null)
             {
                 slotLabelText.text = GetSlotDisplayName(equipmentSlot);
+                // Hide label by default - will show on hover if slot is empty
+                slotLabelText.enabled = false;
             }
 
             if (canvasGroup == null)
@@ -54,17 +206,24 @@ namespace Riftbourne.UI
                 canvasGroup = gameObject.AddComponent<CanvasGroup>();
 
             rootCanvas = GetComponentInParent<Canvas>();
+            
+            // Initialize drop indicator
+            if (dropIndicatorImage != null)
+            {
+                dropIndicatorImage.enabled = false;
+            }
         }
 
         /// <summary>
         /// Initialize the slot with character and panel references.
         /// </summary>
-        public void Initialize(CharacterState character, EquipmentSlotsPanel panel, ItemDetailsPanel detailsPanelRef, ItemGridUI grid = null)
+        public void Initialize(CharacterState character, EquipmentSlotsPanel panel, ItemDetailsPanel detailsPanelRef, ItemGridUI grid = null, InventoryUI inventoryUIRef = null)
         {
             currentCharacter = character;
             parentPanel = panel;
             detailsPanel = detailsPanelRef;
             itemGrid = grid;
+            inventoryUI = inventoryUIRef;
             RefreshDisplay();
         }
 
@@ -78,6 +237,8 @@ namespace Riftbourne.UI
                 // Empty slot
                 if (itemIconImage != null) itemIconImage.enabled = false;
                 if (emptyIndicator != null) emptyIndicator.SetActive(true);
+                // Hide label (will show on hover)
+                if (slotLabelText != null) slotLabelText.enabled = false;
                 return;
             }
 
@@ -95,12 +256,16 @@ namespace Riftbourne.UI
                 {
                     emptyIndicator.SetActive(false);
                 }
+                // Hide label when item is equipped
+                if (slotLabelText != null) slotLabelText.enabled = false;
             }
             else
             {
                 // Empty slot
                 if (itemIconImage != null) itemIconImage.enabled = false;
                 if (emptyIndicator != null) emptyIndicator.SetActive(true);
+                // Hide label by default (will show on hover)
+                if (slotLabelText != null) slotLabelText.enabled = false;
             }
         }
 
@@ -147,6 +312,12 @@ namespace Riftbourne.UI
                 {
                     parentPanel.RefreshAllSlots();
                 }
+
+                // Refresh weight text in inventory UI
+                if (inventoryUI != null)
+                {
+                    inventoryUI.RefreshWeightText();
+                }
             }
         }
 
@@ -173,18 +344,30 @@ namespace Riftbourne.UI
 
         public void OnPointerEnter(PointerEventData eventData)
         {
-            if (currentCharacter == null || detailsPanel == null) return;
+            if (currentCharacter == null) return;
 
             // Update details panel on hover (panel is static, just updates content)
             EquipmentItem equippedItem = currentCharacter.GetEquippedItem(equipmentSlot);
-            if (equippedItem != null)
+            if (equippedItem != null && detailsPanel != null)
             {
                 detailsPanel.ShowItemDetails(equippedItem);
+            }
+
+            // Show slot label if slot is empty
+            if (equippedItem == null && slotLabelText != null)
+            {
+                slotLabelText.enabled = true;
             }
         }
 
         public void OnPointerExit(PointerEventData eventData)
         {
+            // Hide slot label when cursor leaves
+            if (slotLabelText != null)
+            {
+                slotLabelText.enabled = false;
+            }
+            
             // Optionally clear details panel on exit, or keep last hovered item
             // For now, we'll keep the last hovered item visible
         }
@@ -323,6 +506,12 @@ namespace Riftbourne.UI
                     {
                         itemGrid.RefreshGrid();
                     }
+
+                    // Refresh weight text in inventory UI
+                    if (inventoryUI != null)
+                    {
+                        inventoryUI.RefreshWeightText();
+                    }
                 }
                 return;
             }
@@ -350,6 +539,12 @@ namespace Riftbourne.UI
                     {
                         itemGrid.RefreshGrid();
                     }
+
+                    // Refresh weight text in inventory UI
+                    if (inventoryUI != null)
+                    {
+                        inventoryUI.RefreshWeightText();
+                    }
                 }
                 return;
             }
@@ -372,6 +567,12 @@ namespace Riftbourne.UI
                     if (itemGrid != null)
                     {
                         itemGrid.RefreshGrid();
+                    }
+
+                    // Refresh weight text in inventory UI
+                    if (inventoryUI != null)
+                    {
+                        inventoryUI.RefreshWeightText();
                     }
                 }
             }

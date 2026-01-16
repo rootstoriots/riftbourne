@@ -50,7 +50,9 @@ The new inventory system replaces the text-based display with a visual grid syst
 ```
 InventoryTabPanel
 ├── StatsPanel (existing or new)
-│   └── StatsText (TextMeshProUGUI)
+│   ├── CharacterNameText (TextMeshProUGUI)
+│   ├── AurumShardsText (TextMeshProUGUI)
+│   └── WeightText (TextMeshProUGUI)
 ├── MainContent
 │   ├── EquipmentSection
 │   │   └── EquipmentSlotsPanel (GameObject - add EquipmentSlotsPanel component)
@@ -223,18 +225,60 @@ Before setting up the UI, you need to assign portrait sprites to your character 
    c. **Create UI structure:**
       - `SlotBackground` (Image) - background/border
       - `ItemIcon` (Image) - shows equipped item icon
-      - `SlotLabel` (TextMeshProUGUI) - slot name
+      - `SlotLabel` (TextMeshProUGUI) - slot name (hidden by default, shows on hover if empty)
       - `EmptyIndicator` (GameObject) - shows "Empty" text/image
+      
+      **Slot Label Behavior:**
+      - Slot labels are **hidden by default** for a cleaner look
+      - Labels **only appear when hovering** over an **empty** equipment slot
+      - Labels disappear when the cursor moves away
+      - This helps players identify slot types without cluttering the UI
 
    d. **Add drag support:**
       - Add `CanvasGroup` component to the slot GameObject (for drag transparency)
       - (Optional) Create a drag ghost prefab for visual feedback (see "Drag Ghost Prefab Setup" section above)
 
-   e. **Configure EquipmentSlotUI:**
+   e. **Create Drop Indicator (for drag feedback):**
+      - Create child GameObject: `DropIndicator` (Image component)
+      - Position: Same as slot (centered, or adjust as needed)
+      - Size: Slightly larger than slot (e.g., 110% of slot size) or match slot size
+      - **Image Component:**
+        - Set sprite to a highlight/glow effect (e.g., glowing border, highlight ring)
+        - **Color:** Green, blue, or gold (indicates valid drop target)
+          - **Tip:** Use a bright color (e.g., bright green RGB: 0, 255, 0) for better glow effect
+          - The pulsing animation will make it glow brighter/dimmer automatically
+        - Image Type: Simple
+        - Preserve Aspect: ✓ (if using a specific sprite)
+      - **Important:** Set `Raycast Target` to ✗ (unchecked) - should not block interactions
+      - **Order in Layer:** Should be above slot background but below item icon (or adjust as needed)
+      - Initially disabled (will be enabled during drag operations)
+      
+      **Pulsing/Glow Effect:**
+      - The drop indicator automatically pulses when an equipment item is dragged
+      - The pulse effect includes:
+        - **Scale animation:** Grows and shrinks (configurable in Inspector)
+        - **Alpha animation:** Fades in and out (configurable in Inspector)
+        - **Brightness/Glow:** Color brightness pulses (configurable in Inspector)
+      - **Customization (NO CODE NEEDED!):** Adjust pulse settings in the Inspector:
+        - Select the Equipment Slot GameObject
+        - In `EquipmentSlotUI` component, find "Drop Indicator Pulse Settings" section
+        - Adjust these values:
+          - **Pulse Speed:** How fast it pulses (default: 2 = 2 pulses/second)
+          - **Min Scale / Max Scale:** Size range (default: 0.9 to 1.1 = 90% to 110% size)
+          - **Min Alpha / Max Alpha:** Transparency range (default: 0.5 to 1.0 = 50% to 100% opacity)
+          - **Min Brightness / Max Brightness:** Glow intensity (default: 0.7 to 1.2 = 70% to 120% brightness)
+      - **Tips:**
+        - Increase `Max Brightness` (e.g., 1.5) for stronger glow
+        - Increase `Max Scale` (e.g., 1.2) for more dramatic size change
+        - Decrease `Min Alpha` (e.g., 0.3) for more dramatic fade
+        - Increase `Pulse Speed` (e.g., 3) for faster pulsing
+   
+   f. **Configure EquipmentSlotUI:**
       - Drag `SlotBackground` to `Slot Background Image`
       - Drag `ItemIcon` to `Item Icon Image`
       - Drag `SlotLabel` to `Slot Label Text`
       - Drag `EmptyIndicator` to `Empty Indicator`
+      - Drag `DropIndicator` Image to `Drop Indicator Image` field
       - Drag `CanvasGroup` to `Canvas Group` field (or it will auto-add)
       - Set `Drag Alpha` to 0.6 (for semi-transparency during drag)
       - (Optional) Assign drag ghost prefab (see "Drag Ghost Prefab Setup" section above)
@@ -293,7 +337,9 @@ Before setting up the UI, you need to assign portrait sprites to your character 
    ├── ItemNameText (TextMeshProUGUI)
    ├── RarityText (TextMeshProUGUI)
    ├── ItemTypeText (TextMeshProUGUI) - shows human-readable type
-   ├── StatsText (TextMeshProUGUI)
+   ├── CharacterNameText (TextMeshProUGUI)
+   ├── AurumShardsText (TextMeshProUGUI)
+   └── WeightText (TextMeshProUGUI)
    ├── DescriptionText (TextMeshProUGUI)
    ├── WeightText (TextMeshProUGUI)
    ├── ValueText (TextMeshProUGUI) - shows just the number (e.g., "150")
@@ -427,8 +473,18 @@ Before setting up the UI, you need to assign portrait sprites to your character 
 
 1. **Select InventoryUI GameObject** (should be in InventoryTabPanel)
 
-2. **Configure InventoryUI component:**
-   - `Stats Text`: Drag your `StatsText` TextMeshProUGUI
+2. **Create Stats Text Components:**
+   - Create 3 separate TextMeshProUGUI GameObjects:
+     - `CharacterNameText` - displays character name
+     - `AurumShardsText` - displays currency amount
+     - `WeightText` - displays weight information
+   - Position each text component where you want it in the UI
+   - Style each as needed (font size, color, alignment, etc.)
+
+3. **Configure InventoryUI component:**
+   - `Character Name Text`: Drag your `CharacterNameText` TextMeshProUGUI
+   - `Aurum Shards Text`: Drag your `AurumShardsText` TextMeshProUGUI
+   - `Weight Text`: Drag your `WeightText` TextMeshProUGUI
    - `Item Grid`: Drag the `ItemGridUI` GameObject
    - `Equipment Panel`: Drag the `EquipmentSlotsPanel` GameObject
    - `Details Panel`: Drag the `ItemDetailsPanel` GameObject
@@ -494,6 +550,24 @@ Before setting up the UI, you need to assign portrait sprites to your character 
    - Verify portrait preserves aspect ratio (width adjusts, height stays fixed)
    - Verify portrait is behind equipment slots (doesn't cover them)
    - Verify portrait disappears if character has no InventoryTabPortrait assigned
+
+9. **Test Drop Indicator (Equipment Drag Feedback):**
+   - Drag an equipment item from inventory grid
+   - Verify pulsing drop indicators appear on compatible equipment slots
+   - Verify indicators pulse smoothly (scale, alpha, and brightness/glow animation)
+   - Verify indicators disappear when drag ends
+   - Verify indicators only appear for equipment items (not consumables, etc.)
+   - Test with items that can equip in multiple slots (e.g., accessories) - should show on all compatible slots
+   - **Verify glow effect:** The indicator should appear to "glow" brighter and dimmer as it pulses
+
+10. **Test Slot Label Hover Behavior:**
+    - Hover over an **empty** equipment slot
+    - Verify slot label appears (e.g., "Melee Weapon", "Armor", etc.)
+    - Move cursor away from empty slot
+    - Verify slot label disappears
+    - Hover over an **equipped** slot
+    - Verify slot label does NOT appear (only shows for empty slots)
+    - Verify labels don't clutter the UI when not needed
 
 8. **Test Character Switching:**
    - Switch characters using party portraits
@@ -587,6 +661,54 @@ Before setting up the UI, you need to assign portrait sprites to your character 
 - **Verify Preserve Aspect:** Must be checked on Image component
 - **Image Type:** Should be set to "Simple" (not Filled, Sliced, etc.)
 
+### Drop Indicators Not Appearing
+
+- **Check Drop Indicator Image:** Ensure `Drop Indicator Image` is assigned in EquipmentSlotUI Inspector
+- **Check Item Type:** Indicators only appear for EquipmentItem types (not consumables, key items, etc.)
+- **Check Compatible Slots:** Verify the equipment item has compatible slots assigned in its definition
+- **Check Equipment Panel Reference:** Ensure ItemGridUI has EquipmentSlotsPanel reference (set via InventoryUI)
+- **Check Image Enabled:** Drop indicator should start disabled, but will be enabled during drag
+- **Check Raycast Target:** Drop indicator should have Raycast Target unchecked (won't affect functionality, but good practice)
+
+### Drop Indicator Not Pulsing
+
+**First, check these basics:**
+- **Check Drop Indicator Image:** Ensure `Drop Indicator Image` is assigned in EquipmentSlotUI Inspector
+- **Check Image Enabled:** The image should be enabled automatically, but verify it's not manually disabled
+- **Check GameObject Active:** Ensure the Equipment Slot GameObject is active in hierarchy
+- **Check Component Enabled:** Ensure EquipmentSlotUI component is enabled (checkbox in Inspector)
+- **Check Console:** Look for debug messages like "Started pulse animation for [Slot]" or warnings about null DropIndicatorImage
+
+**If still not pulsing:**
+- **Check Sprite:** If using a custom sprite, ensure it's visible and has appropriate transparency
+- **Check Color:** Use a bright color (e.g., bright green RGB: 0, 255, 0) for better visibility
+- **Check Pulse Settings:** In Inspector, verify "Drop Indicator Pulse Settings" values are reasonable:
+  - Pulse Speed should be > 0 (default: 2)
+  - Min/Max Scale should be different (default: 0.9 and 1.1)
+  - Min/Max Alpha should be different (default: 0.5 and 1.0)
+  - Min/Max Brightness should be different (default: 0.7 and 1.2)
+
+**Make Pulse More Visible:**
+- **Increase Max Scale:** Set to 1.2 or 1.3 for more dramatic size change
+- **Decrease Min Alpha:** Set to 0.3 or 0.2 for more dramatic fade
+- **Increase Max Brightness:** Set to 1.5 or 2.0 for stronger glow effect
+- **Increase Pulse Speed:** Set to 3 or 4 for faster, more noticeable pulsing
+
+**Debug Steps:**
+1. Enter Play Mode
+2. Drag an equipment item from inventory
+3. Check Console for "Started pulse animation" messages
+4. If you see warnings about null DropIndicatorImage, assign it in Inspector
+5. If no messages appear, the drag start event might not be firing - check EquipmentSlotsPanel references
+
+### Slot Labels Not Showing on Hover
+
+- **Check Text Component:** Ensure `Slot Label Text` is assigned in EquipmentSlotUI Inspector
+- **Check Empty Slot:** Labels only show when hovering over **empty** slots (not equipped slots)
+- **Check Hover:** Make sure you're actually hovering over the slot (not just nearby)
+- **Check Text Enabled:** The text should be enabled/disabled automatically - verify it's not manually disabled
+- **Check Character:** Ensure `currentCharacter` is set (labels won't show if character is null)
+
 ---
 
 ## Additional Notes
@@ -625,6 +747,8 @@ Before setting up the UI, you need to assign portrait sprites to your character 
 - [ ] CharacterPortrait Image created behind equipment slots
 - [ ] CharacterPortrait assigned to EquipmentSlotsPanel component
 - [ ] CharacterDefinition assets updated with InventoryTabPortrait sprites
+- [ ] DropIndicator Image created for each equipment slot
+- [ ] DropIndicator assigned to EquipmentSlotUI components
 - [ ] DragGhostPrefab assigned to EquipmentSlotUI components
 - [ ] ItemDetailsPanel created and configured
 - [ ] ItemContextMenu created and configured
@@ -632,7 +756,8 @@ Before setting up the UI, you need to assign portrait sprites to your character 
 - [ ] ItemButtonStyle assets created (5 types)
 - [ ] ItemButtonStyleManager created and configured
 - [ ] TreasuryManager created
-- [ ] InventoryUI references assigned
+- [ ] CharacterNameText, AurumShardsText, WeightText created
+- [ ] InventoryUI references assigned (all 3 text components)
 - [ ] StatusMenuUI references verified
 - [ ] All UI elements styled and positioned
 - [ ] Tested in Play Mode

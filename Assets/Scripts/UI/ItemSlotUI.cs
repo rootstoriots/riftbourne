@@ -30,6 +30,7 @@ namespace Riftbourne.UI
         private bool isDragging = false;
         private GameObject dragGhost;
         private Canvas rootCanvas;
+        private EquipmentSlotsPanel equipmentPanel;
 
         // Events
         public System.Action<ItemSlotUI> OnSlotClicked;
@@ -52,12 +53,13 @@ namespace Riftbourne.UI
         /// <summary>
         /// Initialize the slot with inventory data.
         /// </summary>
-        public void Initialize(InventorySlot slot, ItemGridUI grid, ItemDetailsPanel detailsPanelRef, ItemContextMenu contextMenuRef)
+        public void Initialize(InventorySlot slot, ItemGridUI grid, ItemDetailsPanel detailsPanelRef, ItemContextMenu contextMenuRef, EquipmentSlotsPanel equipmentPanelRef = null)
         {
             inventorySlot = slot;
             parentGrid = grid;
             detailsPanel = detailsPanelRef;
             contextMenu = contextMenuRef;
+            equipmentPanel = equipmentPanelRef;
 
             RefreshDisplay();
         }
@@ -108,7 +110,11 @@ namespace Riftbourne.UI
         /// </summary>
         private void ApplyButtonStyle(Item item)
         {
-            if (buttonOverlayImage == null) return;
+            if (buttonOverlayImage == null)
+            {
+                Debug.LogWarning($"ItemSlotUI: ButtonOverlayImage is null! Cannot apply style for {item?.ItemName ?? "null item"}");
+                return;
+            }
 
             // Get style from manager
             ItemButtonStyleManager styleManager = ItemButtonStyleManager.Instance;
@@ -117,24 +123,36 @@ namespace Riftbourne.UI
                 ItemButtonStyle style = styleManager.GetStyleForItemType(item.ItemType);
                 if (style != null)
                 {
-                    buttonOverlayImage.sprite = style.ButtonSprite;
-                    buttonOverlayImage.enabled = style.ButtonSprite != null;
+                    if (style.ButtonSprite != null)
+                    {
+                        buttonOverlayImage.sprite = style.ButtonSprite;
+                        buttonOverlayImage.enabled = true;
 
-                    // Apply rarity-based color tinting
-                    Color baseColor = style.BaseColor;
-                    Color rarityTint = GetRarityColor(item.Rarity);
-                    buttonOverlayImage.color = baseColor * rarityTint;
+                        // Apply rarity-based color tinting using style's GetRarityColor (includes overlayAlpha)
+                        Color finalColor = style.GetRarityColor(item.Rarity);
+                        buttonOverlayImage.color = finalColor;
+                    }
+                    else
+                    {
+                        // Style exists but no sprite - disable overlay
+                        Debug.LogWarning($"ItemSlotUI: Style for {item.ItemType} has no ButtonSprite assigned! Item: {item.ItemName}");
+                        buttonOverlayImage.enabled = false;
+                    }
                 }
                 else
                 {
-                    // Default style
+                    // No style found for this item type
+                    Debug.LogWarning($"ItemSlotUI: No style found for ItemType {item.ItemType}! Item: {item.ItemName}. Check ItemButtonStyleManager.");
                     buttonOverlayImage.enabled = false;
                 }
             }
             else
             {
-                // Fallback: simple rarity color
-                buttonOverlayImage.color = GetRarityColor(item.Rarity);
+                // Fallback: simple rarity color (no style manager)
+                Debug.LogWarning("ItemSlotUI: ItemButtonStyleManager.Instance is null! Using fallback rarity color.");
+                Color rarityColor = GetRarityColor(item.Rarity);
+                rarityColor.a = 0.5f; // Default alpha for fallback
+                buttonOverlayImage.color = rarityColor;
                 buttonOverlayImage.enabled = true;
             }
         }
@@ -229,6 +247,12 @@ namespace Riftbourne.UI
 
             isDragging = true;
 
+            // Notify equipment panel if dragging equipment item
+            if (equipmentPanel != null && inventorySlot.Item is Items.EquipmentItem)
+            {
+                equipmentPanel.OnItemDragStart(this);
+            }
+
             // Create drag ghost
             if (dragGhostPrefab != null && rootCanvas != null)
             {
@@ -269,6 +293,12 @@ namespace Riftbourne.UI
             if (!isDragging) return;
 
             isDragging = false;
+
+            // Notify equipment panel that drag ended
+            if (equipmentPanel != null)
+            {
+                equipmentPanel.OnItemDragEnd();
+            }
 
             // Restore original appearance
             if (canvasGroup != null)

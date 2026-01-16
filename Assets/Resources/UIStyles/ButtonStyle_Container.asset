@@ -12,8 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f3cee2c85fca6ba419d786070c5dca8f, type: 3}
   m_Name: ButtonStyle_Container
   m_EditorClassIdentifier: Assembly-CSharp::Riftbourne.UI.ItemButtonStyle
-  itemType: 0
-  buttonSprite: {fileID: 0}
+  itemType: 4
+  buttonSprite: {fileID: 21300000, guid: e0fcacdfe4093694a9ab13d39624e214, type: 3}
   baseColor: {r: 1, g: 0.95084643, b: 0, a: 1}
   commonColor: {r: 1, g: 1, b: 1, a: 1}
   uncommonColor: {r: 0.8, g: 1, b: 0.8, a: 1}

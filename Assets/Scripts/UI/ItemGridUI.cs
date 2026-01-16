@@ -22,6 +22,7 @@ namespace Riftbourne.UI
         [Header("References")]
         [SerializeField] private ItemDetailsPanel detailsPanel;
         [SerializeField] private ItemContextMenu contextMenu;
+        [SerializeField] private EquipmentSlotsPanel equipmentPanel;
 
         private List<ItemSlotUI> slotUIs = new List<ItemSlotUI>();
         private CharacterState currentCharacter;
@@ -96,7 +97,7 @@ namespace Riftbourne.UI
                 slotUI = slotObj.AddComponent<ItemSlotUI>();
             }
 
-            slotUI.Initialize(slot, this, detailsPanel, contextMenu);
+            slotUI.Initialize(slot, this, detailsPanel, contextMenu, equipmentPanel);
             slotUIs.Add(slotUI);
         }
 
@@ -199,6 +200,24 @@ namespace Riftbourne.UI
                 Debug.Log($"ItemGridUI: Added {quantity}x {item.ItemName} to inventory");
             }
             // If it exists, the item is already in inventory (no action needed)
+        }
+
+        /// <summary>
+        /// Set the equipment panel reference (for drag feedback).
+        /// </summary>
+        public void SetEquipmentPanel(EquipmentSlotsPanel panel)
+        {
+            equipmentPanel = panel;
+            
+            // Update all existing slots with the equipment panel reference
+            foreach (var slotUI in slotUIs)
+            {
+                if (slotUI != null)
+                {
+                    // Re-initialize with equipment panel reference
+                    slotUI.Initialize(slotUI.Slot, this, detailsPanel, contextMenu, equipmentPanel);
+                }
+            }
         }
     }
 }

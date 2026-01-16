@@ -17,7 +17,9 @@ namespace Riftbourne.UI
     public class InventoryUI : MonoBehaviour
     {
         [Header("UI References")]
-        [SerializeField] private TextMeshProUGUI statsText;
+        [SerializeField] private TextMeshProUGUI characterNameText;
+        [SerializeField] private TextMeshProUGUI aurumShardsText;
+        [SerializeField] private TextMeshProUGUI weightText;
         [SerializeField] private ItemGridUI itemGrid;
         [SerializeField] private EquipmentSlotsPanel equipmentPanel;
         [SerializeField] private ItemDetailsPanel detailsPanel;
@@ -172,18 +174,28 @@ namespace Riftbourne.UI
             // Try to find Unit for weight calculations (optional - Unit has weight/encumbrance properties)
             Unit matchingUnit = FindUnitForCharacterState(state);
             
-            // Stats display
-            if (statsText != null)
+            // Character Name
+            if (characterNameText != null)
             {
                 string characterName = state.Definition.CharacterName;
+                characterNameText.text = $"<b>{characterName}</b>";
+            }
+
+            // Aurum Shards
+            if (aurumShardsText != null)
+            {
+                aurumShardsText.text = state.AurumShards.ToString();
+            }
+
+            // Weight
+            if (weightText != null)
+            {
                 string weightInfo = "";
                 
                 // If we found a Unit, use its weight calculations
                 if (matchingUnit != null)
                 {
-                    weightInfo = $"Weight: {matchingUnit.CurrentWeight:F2} / {matchingUnit.EffectiveCarryCapacity:F2} kg " +
-                                $"({matchingUnit.EncumbrancePercent:P0})\n" +
-                                (matchingUnit.IsOverencumbered ? "<color=red>OVERENCUMBERED!</color>" : "");
+                    weightInfo = $"{matchingUnit.CurrentWeight:F2} / {matchingUnit.EffectiveCarryCapacity:F2} kg";
                 }
                 else
                 {
@@ -191,15 +203,10 @@ namespace Riftbourne.UI
                     float totalWeight = CalculateWeightFromInventory(state.Inventory, state.ContainerInventory);
                     // Estimate capacity (CharacterState doesn't have strength, so use default or estimate)
                     float estimatedCapacity = 20.0f; // Default estimate
-                    float encumbrancePercent = estimatedCapacity > 0 ? totalWeight / estimatedCapacity : 0f;
-                    weightInfo = $"Weight: {totalWeight:F2} / {estimatedCapacity:F2} kg " +
-                                $"({encumbrancePercent:P0})\n" +
-                                (encumbrancePercent > 1.0f ? "<color=red>OVERENCUMBERED!</color>" : "");
+                    weightInfo = $"{totalWeight:F2} / {estimatedCapacity:F2} kg";
                 }
                 
-                statsText.text = $"<b>{characterName}</b>\n" +
-                               $"Aurum Shards: {state.AurumShards} 💰\n" +
-                               weightInfo;
+                weightText.text = weightInfo;
             }
             
             // Inventory display - use grid system
@@ -216,7 +223,11 @@ namespace Riftbourne.UI
                 if (itemGrid != null)
                 {
                     equipmentPanel.SetItemGrid(itemGrid);
+                    // Also pass equipmentPanel reference to itemGrid for drag feedback
+                    itemGrid.SetEquipmentPanel(equipmentPanel);
                 }
+                // Pass inventoryUI reference for weight updates
+                equipmentPanel.SetInventoryUI(this);
             }
         }
         
@@ -231,14 +242,22 @@ namespace Riftbourne.UI
                 return;
             }
         
-            // Stats display
-            if (statsText != null)
+            // Character Name
+            if (characterNameText != null)
             {
-                statsText.text = $"<b>{unit.UnitName}</b>\n" +
-                               $"Aurum Shards: {unit.AurumShards} 💰\n" +
-                               $"Weight: {unit.CurrentWeight:F2} / {unit.EffectiveCarryCapacity:F2} kg " +
-                               $"({unit.EncumbrancePercent:P0})\n" +
-                               (unit.IsOverencumbered ? "<color=red>OVERENCUMBERED!</color>" : "");
+                characterNameText.text = $"<b>{unit.UnitName}</b>";
+            }
+
+            // Aurum Shards
+            if (aurumShardsText != null)
+            {
+                aurumShardsText.text = unit.AurumShards.ToString();
+            }
+
+            // Weight
+            if (weightText != null)
+            {
+                weightText.text = $"{unit.CurrentWeight:F2} / {unit.EffectiveCarryCapacity:F2} kg";
             }
             
             // Inventory display - use grid system
@@ -267,9 +286,49 @@ namespace Riftbourne.UI
                 {
                     equipmentPanel.SetItemGrid(itemGrid);
                 }
+                // Pass inventoryUI reference for weight updates
+                equipmentPanel.SetInventoryUI(this);
             }
         }
         
+        /// <summary>
+        /// Refresh only the weight text display.
+        /// Called when inventory or equipment changes to update weight without refreshing entire UI.
+        /// </summary>
+        public void RefreshWeightText()
+        {
+            if (weightText == null) return;
+
+            // Try to use current character state
+            if (currentCharacterState != null)
+            {
+                Unit matchingUnit = FindUnitForCharacterState(currentCharacterState);
+                
+                if (matchingUnit != null)
+                {
+                    // Use Unit's weight calculations (most accurate)
+                    weightText.text = $"{matchingUnit.CurrentWeight:F2} / {matchingUnit.EffectiveCarryCapacity:F2} kg";
+                }
+                else
+                {
+                    // Calculate weight manually from CharacterState inventory
+                    float totalWeight = CalculateWeightFromInventory(currentCharacterState.Inventory, currentCharacterState.ContainerInventory);
+                    float estimatedCapacity = 20.0f; // Default estimate
+                    weightText.text = $"{totalWeight:F2} / {estimatedCapacity:F2} kg";
+                }
+            }
+            else if (currentUnit != null)
+            {
+                // Use Unit's weight directly
+                weightText.text = $"{currentUnit.CurrentWeight:F2} / {currentUnit.EffectiveCarryCapacity:F2} kg";
+            }
+            else
+            {
+                // No character - clear weight
+                weightText.text = "";
+            }
+        }
+
         /// <summary>
         /// Calculate total weight from inventory slots.
         /// </summary>
@@ -307,9 +366,19 @@ namespace Riftbourne.UI
         /// </summary>
         private void ShowEmptyDisplay()
         {
-            if (statsText != null)
+            if (characterNameText != null)
             {
-                statsText.text = "<color=grey>No character selected</color>";
+                characterNameText.text = "<color=grey>No character selected</color>";
+            }
+            
+            if (aurumShardsText != null)
+            {
+                aurumShardsText.text = "";
+            }
+            
+            if (weightText != null)
+            {
+                weightText.text = "";
             }
             
             if (itemGrid != null)

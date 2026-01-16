@@ -23,6 +23,7 @@ namespace Riftbourne.UI
         [Header("References")]
         [SerializeField] private ItemDetailsPanel detailsPanel;
         [SerializeField] private ItemGridUI itemGrid;
+        [SerializeField] private InventoryUI inventoryUI;
         
         [Header("Character Portrait")]
         [Tooltip("Image component displaying the character's full body portrait behind equipment slots. Should preserve aspect ratio with fixed height.")]
@@ -30,6 +31,9 @@ namespace Riftbourne.UI
 
         private CharacterState currentCharacter;
         private Dictionary<EquipmentSlot, EquipmentSlotUI> slotMap = new Dictionary<EquipmentSlot, EquipmentSlotUI>();
+        
+        // Drag feedback tracking
+        private ItemSlotUI currentlyDraggedItemSlot = null;
 
         private void Awake()
         {
@@ -76,12 +80,12 @@ namespace Riftbourne.UI
             // Update character portrait
             UpdateCharacterPortrait(character);
 
-            // Initialize all slots (itemGrid may be set later via SetItemGrid)
+            // Initialize all slots (itemGrid and inventoryUI may be set later via SetItemGrid/SetInventoryUI)
             foreach (var kvp in slotMap)
             {
                 if (kvp.Value != null)
                 {
-                    kvp.Value.Initialize(character, this, detailsPanel, itemGrid);
+                    kvp.Value.Initialize(character, this, detailsPanel, itemGrid, inventoryUI);
                 }
             }
 
@@ -181,7 +185,69 @@ namespace Riftbourne.UI
             {
                 if (slotUI != null && currentCharacter != null)
                 {
-                    slotUI.Initialize(currentCharacter, this, detailsPanel, itemGrid);
+                    slotUI.Initialize(currentCharacter, this, detailsPanel, itemGrid, inventoryUI);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Set the inventory UI reference (for weight text updates).
+        /// </summary>
+        public void SetInventoryUI(InventoryUI ui)
+        {
+            inventoryUI = ui;
+            
+            // Update all slots with the inventory UI reference
+            foreach (var slotUI in slotMap.Values)
+            {
+                if (slotUI != null && currentCharacter != null)
+                {
+                    slotUI.Initialize(currentCharacter, this, detailsPanel, itemGrid, inventoryUI);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Called when an item starts being dragged from inventory.
+        /// Shows drop indicators on compatible equipment slots.
+        /// </summary>
+        public void OnItemDragStart(ItemSlotUI itemSlot)
+        {
+            if (itemSlot == null || itemSlot.Item == null) return;
+
+            currentlyDraggedItemSlot = itemSlot;
+
+            // Check if item is equipment
+            EquipmentItem equipment = itemSlot.Item as EquipmentItem;
+            if (equipment == null) return;
+
+            // Show drop indicators on compatible slots
+            foreach (var kvp in slotMap)
+            {
+                EquipmentSlot slot = kvp.Key;
+                EquipmentSlotUI slotUI = kvp.Value;
+
+                if (slotUI != null && equipment.CanEquipInSlot(slot))
+                {
+                    slotUI.ShowDropIndicator();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Called when an item drag ends.
+        /// Hides all drop indicators.
+        /// </summary>
+        public void OnItemDragEnd()
+        {
+            currentlyDraggedItemSlot = null;
+
+            // Hide all drop indicators
+            foreach (var slotUI in slotMap.Values)
+            {
+                if (slotUI != null)
+                {
+                    slotUI.HideDropIndicator();
                 }
             }
         }
